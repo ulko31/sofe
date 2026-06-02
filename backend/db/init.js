@@ -80,6 +80,21 @@ db.exec(`
     steps TEXT DEFAULT '[]',
     servings INTEGER DEFAULT 2
   );
+  CREATE TABLE IF NOT EXISTS events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    type TEXT DEFAULT 'workout',
+    date TEXT NOT NULL,
+    time TEXT DEFAULT '10:00',
+    end_time TEXT DEFAULT '11:00',
+    emoji TEXT DEFAULT '🌸',
+    location TEXT DEFAULT '',
+    description TEXT DEFAULT '',
+    link TEXT DEFAULT '',
+    color TEXT DEFAULT '#E8437A',
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
   CREATE TABLE IF NOT EXISTS foods (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
