@@ -4,7 +4,7 @@ import { useTelegram } from '../hooks/useTelegram'
 import AIAssistant from './AIAssistant'
 import Notifications from './Notifications'
 
-export default function Profile({ user, tgUser }) {
+export default function Profile({ user, tgUser, onTabChange }) {
   const { haptic } = useTelegram()
   const [progress, setProgress] = useState({ days: 0, weightLost: 0, goalPct: 0 })
   const [editing, setEditing] = useState(false)
@@ -35,6 +35,7 @@ export default function Profile({ user, tgUser }) {
   const menuItems = [
     { icon: 'ti-user', color: 'pink', label: 'Личные данные', action: () => { haptic('light'); setEditing(true) } },
     { icon: 'ti-target', color: 'green', label: 'Цели и параметры', action: () => { haptic('light'); setEditing(true) } },
+    { icon: 'ti-salad', color: 'green', label: 'Питание и рецепты', action: () => { haptic('light'); onTabChange?.('nutrition') } },
     { icon: 'ti-robot', color: 'green', label: 'ИИ-ассистент SOFE', action: () => { haptic('light'); setShowAI(true) }, badge: '✨' },
     { icon: 'ti-stethoscope', color: 'pink', label: 'Консультации', badge: 'Скоро', action: () => haptic('light') },
     { icon: 'ti-bell', color: 'orange', label: 'Уведомления', action: () => { haptic('light'); setShowNotifications(true) } },
