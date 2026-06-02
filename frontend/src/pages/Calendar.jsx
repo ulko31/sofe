@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useTelegram } from '../hooks/useTelegram'
+import api from '../utils/api'
 
 const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
 const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
@@ -23,15 +24,13 @@ export default function Calendar() {
 
   useEffect(() => {
     // Try backend first, fallback to events.json
-    import('../utils/api').then(({ default: api }) => {
-      api.get('/events/all').then(r => {
-        setEvents(r.data || [])
-      }).catch(() => {
-        fetch('/events.json')
-          .then(r => r.json())
-          .then(data => setEvents(data.events || []))
-          .catch(() => setEvents([]))
-      })
+    api.get('/events/all').then(r => {
+      setEvents(r.data || [])
+    }).catch(() => {
+      fetch('/events.json')
+        .then(r => r.json())
+        .then(data => setEvents(data.events || []))
+        .catch(() => setEvents([]))
     })
   }, [])
 
