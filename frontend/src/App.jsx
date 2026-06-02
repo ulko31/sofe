@@ -7,10 +7,11 @@ import Workouts from './pages/Workouts'
 import Nutrition from './pages/Nutrition'
 import Profile from './pages/Profile'
 import MapScreen from './pages/MapScreen'
+import Calendar from './pages/Calendar'
 import Onboarding from './pages/Onboarding'
 
 export default function App() {
-  const { tg, user } = useTelegram()
+  const { user } = useTelegram()
   const [tab, setTab] = useState('home')
   const [appUser, setAppUser] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -19,15 +20,8 @@ export default function App() {
   useEffect(() => {
     if (!user) return
     getMe()
-      .then(r => {
-        setAppUser(r.data.user)
-        setNeedsOnboarding(!r.data.user.onboarded)
-        setLoading(false)
-      })
-      .catch(() => {
-        setNeedsOnboarding(true)
-        setLoading(false)
-      })
+      .then(r => { setAppUser(r.data.user); setNeedsOnboarding(!r.data.user.onboarded); setLoading(false) })
+      .catch(() => { setNeedsOnboarding(true); setLoading(false) })
   }, [user])
 
   useEffect(() => {
@@ -43,7 +37,7 @@ export default function App() {
 
   if (needsOnboarding) return <Onboarding onComplete={(u) => { setAppUser(u); setNeedsOnboarding(false) }} tgUser={user} />
 
-  const screens = { home: Home, workouts: Workouts, nutrition: Nutrition, map: MapScreen, profile: Profile }
+  const screens = { home: Home, workouts: Workouts, nutrition: Nutrition, map: MapScreen, calendar: Calendar, profile: Profile }
   const Screen = screens[tab]
 
   return (
