@@ -22,10 +22,17 @@ export default function Calendar() {
   const [selectedEvent, setSelectedEvent] = useState(null)
 
   useEffect(() => {
-    fetch('/events.json')
-      .then(r => r.json())
-      .then(data => setEvents(data.events || []))
-      .catch(() => setEvents([]))
+    // Try backend first, fallback to events.json
+    import('../utils/api').then(({ default: api }) => {
+      api.get('/events/all').then(r => {
+        setEvents(r.data || [])
+      }).catch(() => {
+        fetch('/events.json')
+          .then(r => r.json())
+          .then(data => setEvents(data.events || []))
+          .catch(() => setEvents([]))
+      })
+    })
   }, [])
 
   // Build calendar grid
