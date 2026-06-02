@@ -260,6 +260,40 @@
   </div>
 </div>
 
+<!-- Recipe Modal -->
+<div id="recipe-modal" class="modal-overlay hidden">
+  <div class="modal" style="width:620px;">
+    <h3 id="recipe-modal-title">Добавить рецепт</h3>
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <input type="hidden" id="recipe-id">
+      <div class="form-grid">
+        <div class="form-group"><label>Название *</label><input type="text" id="recipe-name" placeholder="Греческий салат"></div>
+        <div class="form-group"><label>Эмодзи</label><input type="text" id="recipe-emoji" placeholder="🥗" maxlength="2"></div>
+        <div class="form-group"><label>Калории (на 100г)</label><input type="number" id="recipe-calories" placeholder="180"></div>
+        <div class="form-group"><label>Белки (г)</label><input type="number" id="recipe-protein" placeholder="6"></div>
+        <div class="form-group"><label>Жиры (г)</label><input type="number" id="recipe-fat" placeholder="12"></div>
+        <div class="form-group"><label>Углеводы (г)</label><input type="number" id="recipe-carbs" placeholder="10"></div>
+        <div class="form-group"><label>Время (мин)</label><input type="number" id="recipe-time" placeholder="15"></div>
+        <div class="form-group"><label>Порции</label><input type="number" id="recipe-servings" placeholder="2"></div>
+      </div>
+      <div class="form-group"><label>Теги (через запятую)</label><input type="text" id="recipe-tags" placeholder="ПП, Лёгкий, Завтрак"></div>
+      <div class="form-group"><label>Фото URL (с Unsplash или др.)</label><input type="text" id="recipe-image" placeholder="https://images.unsplash.com/..."></div>
+      <div class="form-group">
+        <label>Ингредиенты (каждый с новой строки, формат: Название — Количество)</label>
+        <textarea id="recipe-ingredients" rows="5" placeholder="Помидоры черри — 200г&#10;Огурец — 1 шт&#10;Сыр Фета — 100г"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Шаги приготовления (каждый шаг с новой строки)</label>
+        <textarea id="recipe-steps" rows="5" placeholder="Нарежь помидоры пополам&#10;Огурец нарежь кубиками&#10;Смешай все ингредиенты"></textarea>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:8px;">
+        <button class="btn btn-pink" style="flex:1;" onclick="saveRecipe()">Сохранить</button>
+        <button class="btn btn-outline" style="flex:1;" onclick="closeModal('recipe-modal')">Отмена</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Event Modal -->
 <div id="event-modal" class="modal-overlay hidden">
   <div class="modal">
@@ -310,6 +344,26 @@ const ADMIN_TOKEN = localStorage.getItem('sofe_admin_token') || ''
 
 let allUsers = []
 let allEvents = []
+let allRecipes = []
+
+async function apiFetch(path, method='GET', data=null) {
+  const url = (localStorage.getItem('sofe_api_url') || 'https://your-backend.onrender.com/api') + path
+  const token = localStorage.getItem('sofe_admin_token') || ''
+  const opts = { method, headers: { 'X-Admin-Token': token, 'Content-Type': 'application/json' } }
+  if (data) opts.body = JSON.stringify(data)
+  const r = await fetch(url, opts)
+  if (!r.ok) throw new Error(r.status)
+  if (method === 'DELETE') return {}
+  return r.json()
+}
+
+function showToast(msg) {
+  const t = document.createElement('div')
+  t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1A1A2E;color:white;padding:10px 20px;border-radius:20px;font-size:13px;font-weight:600;z-index:999;font-family:Nunito,sans-serif;'
+  t.textContent = msg
+  document.body.appendChild(t)
+  setTimeout(() => t.remove(), 2500)
+}
 let selectedEventColor = '#E8437A'
 
 // ── Navigation ─────────────────────────────────────────────
@@ -365,7 +419,7 @@ async function apiDelete(path) {
 async function loadDashboard() {
   document.getElementById('current-date').textContent = new Date().toLocaleDateString('ru', { weekday: 'long', day: 'numeric', month: 'long' })
   try {
-    const data = await apiGet('/admin/stats')
+    const data = await apiFetch('/admin/stats')
     document.getElementById('stat-users').textContent = data.totalUsers || 0
     document.getElementById('stat-active').textContent = data.activeToday || 0
     document.getElementById('stat-meals').textContent = data.totalMeals || 0
@@ -407,7 +461,7 @@ async function loadDashboard() {
 // ── Users ──────────────────────────────────────────────────
 async function loadUsers() {
   try {
-    const data = await apiGet('/admin/users')
+    const data = await apiFetch('/admin/users')
     allUsers = data.users || []
     renderUsers(allUsers)
   } catch(e) {
@@ -444,7 +498,7 @@ async function deleteUser(id) {
 // ── Events ─────────────────────────────────────────────────
 async function loadEvents() {
   try {
-    const data = await apiGet('/admin/events')
+    const data = await apiFetch('/admin/events')
     allEvents = data.events || []
     renderEvents(allEvents)
   } catch(e) {
@@ -522,8 +576,7 @@ async function saveEvent() {
   const date = document.getElementById('event-date').value
   if (!title || !date) { alert('Заполни название и дату'); return }
 
-  const event = {
-    id: parseInt(document.getElementById('event-id').value) || Date.now(),
+  const eventData = {
     title,
     type: document.getElementById('event-type').value,
     date,
@@ -536,60 +589,152 @@ async function saveEvent() {
     color: selectedEventColor
   }
 
-  // Show JSON to copy to events.json
-  const existing = document.getElementById('event-id').value ? allEvents.filter(e => e.id !== event.id) : allEvents
-  const newEvents = [...existing, event].sort((a,b) => new Date(a.date) - new Date(b.date))
-  const json = JSON.stringify({ events: newEvents }, null, 2)
-
-  closeModal('event-modal')
-
-  // Show copy dialog
-  const dialog = document.createElement('div')
-  dialog.className = 'modal-overlay'
-  dialog.innerHTML = `<div class="modal" style="max-width:600px;">
-    <h3>📋 Скопируй в events.json</h3>
-    <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px;">Замени содержимое файла <b>frontend/public/events.json</b> на GitHub:</p>
-    <textarea style="height:200px;font-size:12px;font-family:monospace;" readonly>${json}</textarea>
-    <div style="display:flex;gap:10px;margin-top:12px;">
-      <button class="btn btn-pink" style="flex:1;" onclick="navigator.clipboard.writeText(${JSON.stringify(json)});this.textContent='✅ Скопировано!'">Копировать</button>
-      <button class="btn btn-outline" style="flex:1;" onclick="this.closest('.modal-overlay').remove();loadEvents()">Закрыть</button>
-    </div>
-  </div>`
-  document.body.appendChild(dialog)
+  const existingId = document.getElementById('event-id').value
+  try {
+    if (existingId) {
+      await apiFetch('/admin/events/' + existingId, 'PUT', eventData)
+    } else {
+      await apiFetch('/admin/events', 'POST', eventData)
+    }
+    closeModal('event-modal')
+    loadEvents()
+    showToast('✅ Мероприятие сохранено!')
+  } catch(e) {
+    alert('Ошибка сохранения. Проверь подключение в Настройках.')
+  }
 }
 
 async function deleteEvent(id) {
   if (!confirm('Удалить мероприятие?')) return
-  allEvents = allEvents.filter(e => e.id !== id)
-  renderEvents(allEvents)
-  alert('Удалено локально. Обнови events.json на GitHub вручную.')
+  try {
+    await apiFetch('/admin/events/' + id, 'DELETE')
+    loadEvents()
+    showToast('🗑 Мероприятие удалено')
+  } catch(e) {
+    allEvents = allEvents.filter(e => e.id !== id)
+    renderEvents(allEvents)
+  }
 }
 
 // ── Recipes ────────────────────────────────────────────────
 async function loadRecipes() {
   try {
-    const data = await apiGet('/recipes')
-    const recipes = Array.isArray(data) ? data : []
+    const data = await apiFetch('/admin/recipes')
+    const recipes = data.recipes || []
     document.getElementById('recipes-grid').innerHTML = recipes.length ? recipes.map(r => `
-      <div class="card" style="cursor:pointer;">
+      <div class="card" style="position:relative;">
         <div style="font-size:32px;margin-bottom:8px;">${r.emoji}</div>
         <div style="font-size:14px;font-weight:800;">${r.name}</div>
-        <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">${r.calories} ккал · ${r.time} мин</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">${r.calories} ккал · ${r.time} мин · ${r.servings} порции</div>
         <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
           ${(r.tags||[]).map(t=>`<span class="status status-active" style="font-size:10px;">${t}</span>`).join('')}
         </div>
-      </div>`).join('') : '<div style="color:var(--text-muted);font-size:13px;grid-column:1/-1;">Нет рецептов</div>'
+        <div style="display:flex;gap:6px;margin-top:12px;">
+          <button class="btn btn-outline btn-sm" onclick="editRecipe(${r.id})" style="flex:1;">Ред.</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteRecipe(${r.id})" style="flex:1;">Удалить</button>
+        </div>
+      </div>`).join('') : '<div style="color:var(--text-muted);font-size:13px;grid-column:1/-1;">Нет рецептов — добавь первый!</div>'
+    allRecipes = recipes
   } catch(e) {
     document.getElementById('recipes-grid').innerHTML = '<div style="color:var(--text-muted);font-size:13px;grid-column:1/-1;">⚙️ Настрой подключение в настройках</div>'
   }
 }
 
-function openRecipeModal() { alert('Добавление рецептов через admin API — скоро!') }
+function openRecipeModal() {
+  document.getElementById('recipe-modal-title').textContent = 'Добавить рецепт'
+  document.getElementById('recipe-id').value = ''
+  document.getElementById('recipe-name').value = ''
+  document.getElementById('recipe-emoji').value = '🍽'
+  document.getElementById('recipe-calories').value = ''
+  document.getElementById('recipe-protein').value = ''
+  document.getElementById('recipe-fat').value = ''
+  document.getElementById('recipe-carbs').value = ''
+  document.getElementById('recipe-time').value = '15'
+  document.getElementById('recipe-servings').value = '2'
+  document.getElementById('recipe-tags').value = ''
+  document.getElementById('recipe-image').value = ''
+  document.getElementById('recipe-ingredients').value = ''
+  document.getElementById('recipe-steps').value = ''
+  document.getElementById('recipe-modal').classList.remove('hidden')
+}
+
+function editRecipe(id) {
+  const r = allRecipes.find(x => x.id === id)
+  if (!r) return
+  document.getElementById('recipe-modal-title').textContent = 'Редактировать рецепт'
+  document.getElementById('recipe-id').value = r.id
+  document.getElementById('recipe-name').value = r.name
+  document.getElementById('recipe-emoji').value = r.emoji
+  document.getElementById('recipe-calories').value = r.calories
+  document.getElementById('recipe-protein').value = r.protein
+  document.getElementById('recipe-fat').value = r.fat
+  document.getElementById('recipe-carbs').value = r.carbs
+  document.getElementById('recipe-time').value = r.time
+  document.getElementById('recipe-servings').value = r.servings
+  document.getElementById('recipe-tags').value = (r.tags||[]).join(', ')
+  document.getElementById('recipe-image').value = r.image_url || ''
+  document.getElementById('recipe-ingredients').value = (r.ingredients||[]).map(i => i.name + ' — ' + i.amount).join('\n')
+  document.getElementById('recipe-steps').value = (r.steps||[]).map(s => s.text).join('\n')
+  document.getElementById('recipe-modal').classList.remove('hidden')
+}
+
+async function saveRecipe() {
+  const name = document.getElementById('recipe-name').value.trim()
+  if (!name) { alert('Введи название рецепта'); return }
+
+  const tagsRaw = document.getElementById('recipe-tags').value
+  const tags = tagsRaw.split(',').map(t => t.trim()).filter(Boolean)
+
+  const ingredientsRaw = document.getElementById('recipe-ingredients').value
+  const ingredients = ingredientsRaw.split('\n').filter(Boolean).map((line, i) => {
+    const parts = line.split('—')
+    return { name: (parts[0]||'').trim(), amount: (parts[1]||'').trim() }
+  })
+
+  const stepsRaw = document.getElementById('recipe-steps').value
+  const steps = stepsRaw.split('\n').filter(Boolean).map((text, i) => ({ step: i+1, text: text.trim() }))
+
+  const recipeData = {
+    name,
+    emoji: document.getElementById('recipe-emoji').value || '🍽',
+    calories: parseInt(document.getElementById('recipe-calories').value) || 0,
+    protein: parseFloat(document.getElementById('recipe-protein').value) || 0,
+    fat: parseFloat(document.getElementById('recipe-fat').value) || 0,
+    carbs: parseFloat(document.getElementById('recipe-carbs').value) || 0,
+    time: parseInt(document.getElementById('recipe-time').value) || 15,
+    servings: parseInt(document.getElementById('recipe-servings').value) || 2,
+    tags, ingredients, steps,
+    image_url: document.getElementById('recipe-image').value || ''
+  }
+
+  const existingId = document.getElementById('recipe-id').value
+  try {
+    if (existingId) {
+      await apiFetch('/admin/recipes/' + existingId, 'PUT', recipeData)
+    } else {
+      await apiFetch('/admin/recipes', 'POST', recipeData)
+    }
+    closeModal('recipe-modal')
+    loadRecipes()
+    showToast('✅ Рецепт сохранён!')
+  } catch(e) {
+    alert('Ошибка сохранения. Проверь подключение.')
+  }
+}
+
+async function deleteRecipe(id) {
+  if (!confirm('Удалить рецепт?')) return
+  try {
+    await apiFetch('/admin/recipes/' + id, 'DELETE')
+    loadRecipes()
+    showToast('🗑 Рецепт удалён')
+  } catch(e) { alert('Ошибка удаления') }
+}
 
 // ── Nutrition ──────────────────────────────────────────────
 async function loadNutrition() {
   try {
-    const data = await apiGet('/admin/nutrition')
+    const data = await apiFetch('/admin/nutrition')
     document.getElementById('n-today').textContent = data.today || 0
     document.getElementById('n-avg').textContent = data.avgCalories || 0
     document.getElementById('n-popular').textContent = data.popularType || '—'
