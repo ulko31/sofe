@@ -6,11 +6,7 @@ const app = express()
 const PORT = process.env.PORT || 4000
 
 app.use(cors({
-  origin: [
-    process.env.MINI_APP_URL,
-    'http://localhost:3000',
-    'https://localhost:3000'
-  ],
+  origin: '*',
   credentials: true
 }))
 app.use(express.json())
@@ -22,16 +18,16 @@ const nutritionRoutes = require('./routes/nutrition')
 const miscRoutes = require('./routes/misc')
 const foodsRoutes = require('./routes/foods')
 const aiRoutes = require('./routes/ai')
+const adminRoutes = require('./routes/admin')
 
 app.use('/api/user', userRoutes)
 app.use('/api/nutrition', nutritionRoutes)
 app.use('/api/foods', foodsRoutes)
 app.use('/api/ai', aiRoutes)
+app.use('/api/admin', adminRoutes)
 app.use('/api/trackers', (req, res, next) => { req.url = '/'; miscRoutes(req, res, next) })
 app.use('/api', miscRoutes)
 
 app.get('/health', (req, res) => res.json({ ok: true, version: '1.0.0' }))
 
-app.listen(PORT, () => {
-  console.log(`🚀 SOFE Backend running on port ${PORT}`)
-})
+app.listen(PORT, () => console.log(`🚀 SOFE Backend running on port ${PORT}`))
