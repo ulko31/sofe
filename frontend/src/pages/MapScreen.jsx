@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useTelegram } from '../hooks/useTelegram'
 
-const YANDEX_KEY = import.meta.env.VITE_YANDEX_MAPS_KEY || 'd69bde69-88db-4d98-8f71-62a35c3b15ce'
+const YANDEX_KEY = import.meta.env.VITE_YANDEX_MAPS_KEY || ''
 
 const CATEGORIES = [
   { id: 'all', label: 'Все', icon: '🗺' },
