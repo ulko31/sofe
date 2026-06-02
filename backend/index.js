@@ -30,4 +30,7 @@ app.use('/api', miscRoutes)
 
 app.get('/health', (req, res) => res.json({ ok: true, version: '1.0.0' }))
 
+// Start notification scheduler
+require('./notifications')
+
 app.listen(PORT, () => console.log(`🚀 SOFE Backend running on port ${PORT}`))
