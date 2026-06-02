@@ -15,18 +15,18 @@ app.use(cors({
 }))
 app.use(express.json())
 
-// Init DB
 require('./db/init')
 
-// Routes
 const userRoutes = require('./routes/user')
 const nutritionRoutes = require('./routes/nutrition')
 const miscRoutes = require('./routes/misc')
 const foodsRoutes = require('./routes/foods')
+const aiRoutes = require('./routes/ai')
 
 app.use('/api/user', userRoutes)
 app.use('/api/nutrition', nutritionRoutes)
 app.use('/api/foods', foodsRoutes)
+app.use('/api/ai', aiRoutes)
 app.use('/api/trackers', (req, res, next) => { req.url = '/'; miscRoutes(req, res, next) })
 app.use('/api', miscRoutes)
 
