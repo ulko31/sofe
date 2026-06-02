@@ -1,6 +1,4 @@
-const db = require('./init')
-
-function seedRecipes() {
+function seedRecipes(db) {
   // Clear and reseed
   // Check if already seeded with real recipes (ones that have image_url)
   const hasReal = db.prepare("SELECT COUNT(*) as cnt FROM recipes WHERE image_url IS NOT NULL AND image_url != ''").get()
