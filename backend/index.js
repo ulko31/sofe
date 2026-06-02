@@ -5,7 +5,6 @@ const cors = require('cors')
 const app = express()
 const PORT = process.env.PORT || 4000
 
-// Middleware
 app.use(cors({
   origin: [
     process.env.MINI_APP_URL,
@@ -23,13 +22,14 @@ require('./db/init')
 const userRoutes = require('./routes/user')
 const nutritionRoutes = require('./routes/nutrition')
 const miscRoutes = require('./routes/misc')
+const foodsRoutes = require('./routes/foods')
 
 app.use('/api/user', userRoutes)
 app.use('/api/nutrition', nutritionRoutes)
+app.use('/api/foods', foodsRoutes)
 app.use('/api/trackers', (req, res, next) => { req.url = '/'; miscRoutes(req, res, next) })
 app.use('/api', miscRoutes)
 
-// Health check
 app.get('/health', (req, res) => res.json({ ok: true, version: '1.0.0' }))
 
 app.listen(PORT, () => {
