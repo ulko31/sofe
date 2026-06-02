@@ -6,6 +6,7 @@ import Home from './pages/Home'
 import Workouts from './pages/Workouts'
 import Nutrition from './pages/Nutrition'
 import Profile from './pages/Profile'
+import MapScreen from './pages/MapScreen'
 import Onboarding from './pages/Onboarding'
 
 export default function App() {
@@ -24,33 +25,25 @@ export default function App() {
         setLoading(false)
       })
       .catch(() => {
-        // New user — will be created on first request
         setNeedsOnboarding(true)
         setLoading(false)
       })
   }, [user])
 
-  // Dev mode — no Telegram
   useEffect(() => {
-    if (!window.Telegram?.WebApp?.initData) {
-      setLoading(false)
-    }
+    if (!window.Telegram?.WebApp?.initData) setLoading(false)
   }, [])
 
-  if (loading) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
-        <div className="spinner" />
-        <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>Загружаем SOFE...</p>
-      </div>
-    )
-  }
+  if (loading) return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+      <div className="spinner" />
+      <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>Загружаем SOFE...</p>
+    </div>
+  )
 
-  if (needsOnboarding) {
-    return <Onboarding onComplete={(u) => { setAppUser(u); setNeedsOnboarding(false) }} tgUser={user} />
-  }
+  if (needsOnboarding) return <Onboarding onComplete={(u) => { setAppUser(u); setNeedsOnboarding(false) }} tgUser={user} />
 
-  const screens = { home: Home, workouts: Workouts, nutrition: Nutrition, profile: Profile }
+  const screens = { home: Home, workouts: Workouts, nutrition: Nutrition, map: MapScreen, profile: Profile }
   const Screen = screens[tab]
 
   return (
