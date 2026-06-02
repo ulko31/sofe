@@ -2,10 +2,11 @@ const db = require('./init')
 
 function seedRecipes() {
   // Clear and reseed
-  const count = db.prepare('SELECT COUNT(*) as cnt FROM recipes').get()
-  if (count.cnt > 6) return // already seeded with real data
+  // Check if already seeded with real recipes (ones that have image_url)
+  const hasReal = db.prepare("SELECT COUNT(*) as cnt FROM recipes WHERE image_url IS NOT NULL AND image_url != ''").get()
+  if (hasReal.cnt > 0) return
 
-  db.prepare('DELETE FROM recipes').run()
+  db.prepare("DELETE FROM recipes WHERE image_url IS NULL OR image_url = ''").run()
 
   const insert = db.prepare(`
     INSERT INTO recipes (name, calories, protein, fat, carbs, time, emoji, tags, image_url, ingredients, steps, servings)
