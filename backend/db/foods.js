@@ -1,6 +1,4 @@
-const db = require('./init')
-
-function seedFoods() {
+function seedFoods(db) {
   const count = db.prepare('SELECT COUNT(*) as cnt FROM foods').get()
   if (count.cnt > 0) return
 
