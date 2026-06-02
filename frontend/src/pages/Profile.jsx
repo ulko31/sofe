@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react'
 import { getProgress, updateProfile } from '../utils/api'
 import { useTelegram } from '../hooks/useTelegram'
 import AIAssistant from './AIAssistant'
+import Notifications from './Notifications'
 
 export default function Profile({ user, tgUser }) {
   const { haptic } = useTelegram()
   const [progress, setProgress] = useState({ days: 0, weightLost: 0, goalPct: 0 })
   const [editing, setEditing] = useState(false)
   const [showAI, setShowAI] = useState(false)
+  const [showNotifications, setShowNotifications] = useState(false)
   const [form, setForm] = useState({ name: '', calories: '', goal: '' })
 
   useEffect(() => {
@@ -28,13 +30,14 @@ export default function Profile({ user, tgUser }) {
   }
 
   if (showAI) return <AIAssistant user={user} onBack={() => setShowAI(false)} />
+  if (showNotifications) return <Notifications user={user} onBack={() => setShowNotifications(false)} />
 
   const menuItems = [
     { icon: 'ti-user', color: 'pink', label: 'Личные данные', action: () => { haptic('light'); setEditing(true) } },
     { icon: 'ti-target', color: 'green', label: 'Цели и параметры', action: () => { haptic('light'); setEditing(true) } },
     { icon: 'ti-robot', color: 'green', label: 'ИИ-ассистент SOFE', action: () => { haptic('light'); setShowAI(true) }, badge: '✨' },
     { icon: 'ti-stethoscope', color: 'pink', label: 'Консультации', badge: 'Скоро', action: () => haptic('light') },
-    { icon: 'ti-bell', color: 'orange', label: 'Уведомления', action: () => haptic('light') },
+    { icon: 'ti-bell', color: 'orange', label: 'Уведомления', action: () => { haptic('light'); setShowNotifications(true) } },
     { icon: 'ti-calendar', color: 'green', label: 'Календарь', action: () => haptic('light') },
     { icon: 'ti-map-pin', color: 'pink', label: 'Студии рядом', action: () => haptic('light') },
     { icon: 'ti-help-circle', color: 'orange', label: 'Поддержка', action: () => haptic('light') }
