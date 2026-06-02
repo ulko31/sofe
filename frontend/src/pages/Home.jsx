@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { getTodayStats, getTrackers, getMeals, updateTracker, addMeal, deleteMeal, searchFoods } from '../utils/api'
 import { useTelegram } from '../hooks/useTelegram'
+import FoodScan from './FoodScan'
 
 export default function Home({ user }) {
   const { haptic } = useTelegram()
@@ -10,6 +11,7 @@ export default function Home({ user }) {
   const [loading, setLoading] = useState(true)
   const [showAddMeal, setShowAddMeal] = useState(false)
   const [addMealType, setAddMealType] = useState('snack')
+  const [showScan, setShowScan] = useState(false)
 
   // Food search state
   const [query, setQuery] = useState('')
@@ -135,6 +137,16 @@ export default function Home({ user }) {
 
   const mealOrder = ['breakfast', 'lunch', 'dinner', 'snack']
 
+  if (showScan) return (
+    <FoodScan
+      onBack={() => setShowScan(false)}
+      onMealAdded={(meal) => {
+        setMeals(m => [...m, meal])
+        setStats(s => ({ ...s, consumed: s.consumed + (meal.calories || 0) }))
+      }}
+    />
+  )
+
   if (loading) return (
     <div className="screen" style={{ alignItems: 'center', justifyContent: 'center' }}>
       <div className="spinner" />
@@ -219,6 +231,12 @@ export default function Home({ user }) {
       <div>
         <div className="section-header">
           <h3>Питание</h3>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={() => { haptic('light'); setShowScan(true) }} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--green-light)', border: 'none', color: 'var(--green-dark)', borderRadius: 8, padding: '5px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Nunito, sans-serif' }}>
+              <i className="ti ti-scan" style={{ fontSize: 14 }} /> Сканер
+            </button>
+            <a onClick={() => { haptic('light'); setShowAddMeal(true) }}>+ Добавить</a>
+          </div>
         </div>
 
         {/* Quick add buttons */}
