@@ -122,9 +122,9 @@ if (wCount.cnt === 0) {
 }
 
 const { seedFoods } = require('./foods')
-seedFoods()
+seedFoods(db)
 
 const { seedRecipes } = require('./recipes_seed')
-seedRecipes()
+seedRecipes(db)
 
 module.exports = db
