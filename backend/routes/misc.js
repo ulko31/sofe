@@ -60,6 +60,17 @@ router.post('/subscriptions/:id/use', auth, (req, res) => {
   res.json(db.prepare('SELECT * FROM subscriptions WHERE id = ?').get(req.params.id))
 })
 
+// ── PUBLIC EVENTS ─────────────────────────────────────────
+router.get('/events/all', auth, (req, res) => {
+  const events = db.prepare('SELECT * FROM events ORDER BY date ASC').all()
+  res.json(events.map(e => ({
+    id: e.id, title: e.title, type: e.type,
+    date: e.date, time: e.time, endTime: e.end_time,
+    emoji: e.emoji, location: e.location,
+    description: e.description, link: e.link, color: e.color
+  })))
+})
+
 // ── RECIPES ───────────────────────────────────────────────────
 router.get('/recipes', auth, (req, res) => {
   const recipes = db.prepare('SELECT * FROM recipes').all()
