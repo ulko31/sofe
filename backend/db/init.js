@@ -88,6 +88,17 @@ db.exec(`
     ingredients TEXT DEFAULT '[]',
     steps TEXT DEFAULT '[]'
   );
+
+  CREATE TABLE IF NOT EXISTS foods (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    calories INTEGER NOT NULL,
+    protein REAL DEFAULT 0,
+    fat REAL DEFAULT 0,
+    carbs REAL DEFAULT 0,
+    unit TEXT DEFAULT '100г',
+    unit_weight INTEGER DEFAULT 100
+  );
 `)
 
 // Seed workouts
@@ -117,5 +128,9 @@ if (existingRecipes.cnt === 0) {
     ['Куриный суп', 280, 45, '🍲', '["ПП","Сытный"]']
   ].forEach(r => insertRecipe.run(...r))
 }
+
+// Seed foods
+const { seedFoods } = require('./foods')
+seedFoods()
 
 module.exports = db
