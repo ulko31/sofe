@@ -165,7 +165,7 @@ export default function FoodScan({ onBack, onMealAdded }) {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          model: 'llama-3.2-11b-vision-preview',
+          model: 'meta-llama/llama-4-scout-17b-16e-instruct',
           messages: [{
             role: 'user',
             content: [
