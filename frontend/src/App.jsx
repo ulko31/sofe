@@ -9,10 +9,12 @@ import Profile from './pages/Profile'
 import MapScreen from './pages/MapScreen'
 import Calendar from './pages/Calendar'
 import Onboarding from './pages/Onboarding'
+import AIAssistant from './pages/AIAssistant'
 
 export default function App() {
   const { user } = useTelegram()
   const [tab, setTab] = useState('home')
+  const [showAI, setShowAI] = useState(false)
   const [appUser, setAppUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [needsOnboarding, setNeedsOnboarding] = useState(false)
@@ -39,6 +41,9 @@ export default function App() {
 
   const screens = { home: Home, workouts: Workouts, nutrition: Nutrition, map: MapScreen, calendar: Calendar, profile: Profile }
   const Screen = screens[tab]
+
+  // Check if current screen should hide bottom nav
+  const hideNav = false // Profile handles AI internally
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
