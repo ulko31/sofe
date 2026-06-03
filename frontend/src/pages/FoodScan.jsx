@@ -147,24 +147,17 @@ export default function FoodScan({ onBack, onMealAdded }) {
     setResult(null)
     haptic('light')
 
+    const imageFile = URL.createObjectURL(file)
+
     try {
       const groqToken = import.meta.env.VITE_GROQ_TOKEN
       if (!groqToken) throw new Error('no_token')
 
-      const imageFile = URL.createObjectURL(file)
+      // Resize image to max 512px to reduce base64 size
+      const resized = await resizeImage(file, 512)
+      const mimeType = 'image/jpeg'
+      const dataUrl = `data:${mimeType};base64,${resized}`
 
-      // Convert to base64
-      const base64 = await new Promise(res => {
-        const reader = new FileReader()
-        reader.onload = () => res(reader.result.split(',')[1])
-        reader.readAsDataURL(file)
-      })
-
-      // Get mime type
-      const mimeType = file.type || 'image/jpeg'
-      const dataUrl = `data:${mimeType};base64,${base64}`
-
-      // Use Groq vision model
       const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -176,69 +169,78 @@ export default function FoodScan({ onBack, onMealAdded }) {
           messages: [{
             role: 'user',
             content: [
-              {
-                type: 'image_url',
-                image_url: {
-                  url: dataUrl,
-                  detail: 'low'
-                }
-              },
-              {
-                type: 'text',
-                text: 'Look at this food photo and respond ONLY with JSON (no other text): {"name": "название блюда на русском языке", "calories": number per 100g, "protein": number, "fat": number, "carbs": number, "confidence": 0-100}. If no food visible: {"error": "not_food"}'
-              }
+              { type: 'image_url', image_url: { url: dataUrl, detail: 'low' } },
+              { type: 'text', text: 'What food is in this image? Reply ONLY with this JSON format, nothing else: {"name":"food name in Russian","calories":kcal_per_100g,"protein":g,"fat":g,"carbs":g}' }
             ]
           }],
-          max_tokens: 150,
-          temperature: 0.1
+          max_tokens: 100,
+          temperature: 0
         })
       })
 
       if (!response.ok) {
-        const err = await response.json().catch(() => ({}))
-        if (response.status === 401) throw new Error('invalid_token')
-        throw new Error(err.error?.message || `HTTP ${response.status}`)
+        const errData = await response.json().catch(() => ({}))
+        console.error('Groq Vision error:', response.status, errData)
+        throw new Error(errData.error?.message || `HTTP ${response.status}`)
       }
 
       const data = await response.json()
-      const text = data.choices?.[0]?.message?.content?.trim()
-      if (!text) throw new Error('empty')
+      const text = data.choices?.[0]?.message?.content?.trim() || ''
+      console.log('Groq Vision response:', text)
 
-      // Parse JSON from response
-      const jsonMatch = text.match(/\{[\s\S]*\}/)
-      if (!jsonMatch) throw new Error('parse_error')
+      const jsonMatch = text.match(/\{[^}]+\}/)
+      if (!jsonMatch) throw new Error('no_json')
 
       const parsed = JSON.parse(jsonMatch[0])
 
-      if (parsed.error === 'not_food') {
-        setError('На фото не видно еды. Попробуй сфотографировать блюдо крупнее.')
-        setProcessing(false)
-        return
-      }
-
       setResult({
         source: 'photo',
-        name: parsed.name || 'Неизвестное блюдо',
-        confidence: parsed.confidence || 85,
-        calories: parsed.calories || 200,
-        protein: parsed.protein || 0,
-        fat: parsed.fat || 0,
-        carbs: parsed.carbs || 0,
+        name: parsed.name || 'Блюдо',
+        confidence: 90,
+        calories: Math.round(parsed.calories) || 200,
+        protein: Math.round((parsed.protein || 0) * 10) / 10,
+        fat: Math.round((parsed.fat || 0) * 10) / 10,
+        carbs: Math.round((parsed.carbs || 0) * 10) / 10,
         unit_weight: 100,
         imageFile
       })
     } catch(e) {
-      console.error('Photo scan error:', e)
+      console.error('Photo error:', e.message)
       if (e.message === 'no_token') {
-        setError('Токен Groq не настроен. Добавь VITE_GROQ_TOKEN в переменные Vercel.')
-      } else if (e.message === 'invalid_token') {
+        setError('Токен Groq не настроен. Добавь VITE_GROQ_TOKEN в Vercel.')
+      } else if (e.message?.includes('401')) {
         setError('Токен Groq недействителен. Создай новый на console.groq.com.')
+      } else if (e.message === 'no_json') {
+        setError('Не удалось распознать блюдо. Попробуй другое фото.')
       } else {
-        setError('Не удалось распознать блюдо. Попробуй фото с лучшим освещением.')
+        setError('Ошибка: ' + e.message)
       }
     } finally {
       setProcessing(false)
     }
+  }
+
+  // Resize image to max size using canvas
+  async function resizeImage(file, maxSize) {
+    return new Promise((resolve, reject) => {
+      const img = new Image()
+      const url = URL.createObjectURL(file)
+      img.onload = () => {
+        URL.revokeObjectURL(url)
+        const canvas = document.createElement('canvas')
+        let w = img.width, h = img.height
+        if (w > h) { if (w > maxSize) { h = h * maxSize / w; w = maxSize } }
+        else { if (h > maxSize) { w = w * maxSize / h; h = maxSize } }
+        canvas.width = Math.round(w)
+        canvas.height = Math.round(h)
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+        const b64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1]
+        resolve(b64)
+      }
+      img.onerror = reject
+      img.src = url
+    })
   }
 
   const foodTranslations = {
