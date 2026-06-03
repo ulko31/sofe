@@ -5,15 +5,26 @@ const auth = require('../middleware/auth')
 
 // GET /api/friends — my friends list
 router.get('/', auth, (req, res) => {
+  // Create locations table if not exists
+  try {
+    db.exec(`CREATE TABLE IF NOT EXISTS user_locations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL UNIQUE,
+      lat REAL, lng REAL,
+      share_location INTEGER DEFAULT 0,
+      updated_at TEXT DEFAULT (datetime('now'))
+    )`)
+  } catch(e) {}
+
   const friends = db.prepare(`
     SELECT u.id, u.name, u.username, u.telegram_id, u.goal, u.calories,
-           f.status, f.created_at as friend_since,
+           f.status, f.id as friendship_id,
            ul.lat, ul.lng, ul.share_location, ul.updated_at as location_updated
     FROM friendships f
     JOIN users u ON (
       CASE WHEN f.user_id = ? THEN f.friend_id ELSE f.user_id END = u.id
     )
-    LEFT JOIN user_locations ul ON ul.user_id = u.id
+    LEFT JOIN user_locations ul ON ul.user_id = u.id AND ul.share_location = 1
     WHERE (f.user_id = ? OR f.friend_id = ?) AND f.status = 'accepted'
     ORDER BY u.name
   `).all(req.user.id, req.user.id, req.user.id)
@@ -124,13 +135,26 @@ router.delete('/:id', auth, (req, res) => {
 // POST /api/friends/location — update my location
 router.post('/location', auth, (req, res) => {
   const { lat, lng, share } = req.body
+  try {
+    db.exec(`CREATE TABLE IF NOT EXISTS user_locations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL UNIQUE,
+      lat REAL, lng REAL,
+      share_location INTEGER DEFAULT 0,
+      updated_at TEXT DEFAULT (datetime('now'))
+    )`)
+  } catch(e) {}
+
   db.prepare(`
     INSERT INTO user_locations (user_id, lat, lng, share_location, updated_at)
     VALUES (?, ?, ?, ?, datetime('now'))
     ON CONFLICT(user_id) DO UPDATE SET
-      lat = ?, lng = ?, share_location = ?, updated_at = datetime('now')
-  `).run(req.user.id, lat, lng, share ? 1 : 0, lat, lng, share ? 1 : 0)
-  res.json({ ok: true })
+      lat = excluded.lat,
+      lng = excluded.lng,
+      share_location = excluded.share_location,
+      updated_at = datetime('now')
+  `).run(req.user.id, lat || 0, lng || 0, share ? 1 : 0)
+  res.json({ ok: true, lat, lng, share })
 })
 
 // POST /api/friends/invite-event — invite friend to event
