@@ -120,7 +120,7 @@ export default function AIAssistant({ user, onBack }) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', background: 'var(--bg)', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 50 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', background: 'var(--bg)', minHeight: '100vh', paddingBottom: 0 }}>
       {/* Header */}
       <div style={{ background: 'var(--pink)', padding: '48px 16px 16px', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
         <button onClick={onBack} style={{ color: 'white', fontSize: 22, background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
@@ -134,7 +134,7 @@ export default function AIAssistant({ user, onBack }) {
       </div>
 
       {/* Messages */}
-      <div ref={messagesRef} style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div ref={messagesRef} style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: 12, minHeight: 200 }}>
         {messages.map((msg, i) => (
           <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
             {msg.role === 'assistant' && (
@@ -180,7 +180,7 @@ export default function AIAssistant({ user, onBack }) {
       )}
 
       {/* Input */}
-      <div style={{ background: 'var(--white)', borderTop: '0.5px solid var(--border)', padding: '10px 16px 20px', display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
+      <div style={{ background: 'var(--white)', borderTop: '0.5px solid var(--border)', padding: '10px 16px 28px', display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0, position: 'sticky', bottom: 0, zIndex: 10 }}>
         <input
           value={input}
           onChange={e => setInput(e.target.value)}
