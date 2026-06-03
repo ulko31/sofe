@@ -47,20 +47,37 @@ export default function Friends({ user, onBack }) {
     } catch(e) {}
   }
 
-  // Check if opened via invite link
+  // Check if opened via invite link (Telegram passes via start_param)
   const checkInviteAction = async () => {
-    const params = new URLSearchParams(window.location.search)
-    const action = params.get('action')
-    const token = params.get('token')
-    if (action === 'accept_friend' && token) {
+    // Try Telegram WebApp start_param first
+    const tg = window.Telegram?.WebApp
+    const startParam = tg?.initDataUnsafe?.start_param || ''
+
+    // Also check URL params as fallback
+    const urlParams = new URLSearchParams(window.location.search)
+    const urlAction = urlParams.get('action')
+    const urlToken = urlParams.get('token')
+
+    let token = null
+    if (startParam.startsWith('friend_')) {
+      token = startParam.replace('friend_', '')
+    } else if (urlAction === 'accept_friend' && urlToken) {
+      token = urlToken
+    }
+
+    if (token) {
       try {
         const res = await api.post('/friends/accept-invite', { token })
         if (res.data.success) {
           haptic('medium')
-          alert(`✅ Вы теперь друзья с ${res.data.friend.name}!`)
+          alert(`✅ Вы теперь подруги с ${res.data.friend.name}! 🌸`)
           loadData()
+        } else if (res.data.already_friends) {
+          alert(`Вы уже подруги с ${res.data.friend?.name || 'этим пользователем'}!`)
         }
-      } catch(e) {}
+      } catch(e) {
+        console.error('Invite error:', e)
+      }
     }
   }
 
@@ -204,9 +221,9 @@ export default function Friends({ user, onBack }) {
                     <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
                       {goalLabel[friend.goal] || '❤️ Здоровье'} · {friend.calories || 2000} ккал
                     </div>
-                    {friend.share_location && friend.lat && (
+                    {friend.share_location && friend.lat && parseFloat(friend.lat) !== 0 && (
                       <div style={{ fontSize: 11, color: 'var(--green)', marginTop: 2, fontWeight: 600 }}>
-                        📍 Геолокация доступна · {timeAgo(friend.location_updated)}
+                        📍 На карте · {timeAgo(friend.location_updated)}
                       </div>
                     )}
                   </div>
@@ -218,7 +235,7 @@ export default function Friends({ user, onBack }) {
                   <div style={{ marginTop: 14, paddingTop: 14, borderTop: '0.5px solid var(--border)' }}>
                     <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 10 }}>Действия:</div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                      {friend.share_location && friend.lat && (
+                      {friend.share_location && friend.lat && parseFloat(friend.lat) !== 0 && (
                         <button onClick={(e) => { e.stopPropagation(); haptic('light'); window.open(`https://yandex.ru/maps/?pt=${friend.lng},${friend.lat}&z=15`, '_blank') }}
                           style={{ padding: '8px 14px', borderRadius: 10, background: 'var(--green-light)', border: 'none', color: 'var(--green-dark)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Nunito, sans-serif' }}>
                           📍 На карте
