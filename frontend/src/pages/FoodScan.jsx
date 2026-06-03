@@ -40,12 +40,69 @@ export default function FoodScan({ onBack, onMealAdded }) {
   }
 
   // ── BARCODE ──────────────────────────────────────────────
-  const startBarcodeScanner = () => {
-    // In Telegram iOS, Quagga doesn't work well
-    // Use manual input which works everywhere
+  const startBarcodeScanner = async () => {
     setMode('barcode')
+    setScanning(true)
     setError(null)
     setResult(null)
+
+    if (!window.Quagga) {
+      try {
+        await new Promise((res, rej) => {
+          const s = document.createElement('script')
+          s.src = 'https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js'
+          s.onload = res; s.onerror = rej
+          document.head.appendChild(s)
+        })
+      } catch(e) {
+        setError('Не удалось загрузить сканер. Введи штрихкод вручную ниже.')
+        setScanning(false)
+        return
+      }
+    }
+
+    try {
+      const container = videoRef.current
+      const w = container.offsetWidth || 320
+      const h = Math.round(w * 0.75)
+
+      await new Promise((resolve, reject) => {
+        window.Quagga.init({
+          inputStream: {
+            name: 'Live',
+            type: 'LiveStream',
+            target: container,
+            constraints: {
+              width: { ideal: w },
+              height: { ideal: h },
+              facingMode: 'environment'
+            }
+          },
+          decoder: {
+            readers: ['ean_reader', 'ean_8_reader', 'upc_reader', 'code_128_reader']
+          },
+          locate: true
+        }, err => err ? reject(err) : resolve())
+      })
+
+      quaggaRef.current = window.Quagga
+      window.Quagga.start()
+
+      let detected = false
+      window.Quagga.onDetected(async data => {
+        if (detected) return
+        detected = true
+        const code = data.codeResult.code
+        haptic('medium')
+        window.Quagga.stop()
+        quaggaRef.current = null
+        setScanning(false)
+        await lookupBarcode(code)
+      })
+    } catch(e) {
+      setError('Не удалось запустить камеру. Введи штрихкод вручную ниже.')
+      setScanning(false)
+    }
   }
 
   const lookupBarcode = async (barcode) => {
@@ -94,16 +151,20 @@ export default function FoodScan({ onBack, onMealAdded }) {
       const groqToken = import.meta.env.VITE_GROQ_TOKEN
       if (!groqToken) throw new Error('no_token')
 
-      // Convert to base64 data URL
-      const dataUrl = await new Promise(res => {
+      const imageFile = URL.createObjectURL(file)
+
+      // Convert to base64
+      const base64 = await new Promise(res => {
         const reader = new FileReader()
-        reader.onload = () => res(reader.result)
+        reader.onload = () => res(reader.result.split(',')[1])
         reader.readAsDataURL(file)
       })
 
-      const imageFile = URL.createObjectURL(file)
+      // Get mime type
+      const mimeType = file.type || 'image/jpeg'
+      const dataUrl = `data:${mimeType};base64,${base64}`
 
-      // Use Groq vision model to identify food
+      // Use Groq vision model
       const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -117,15 +178,18 @@ export default function FoodScan({ onBack, onMealAdded }) {
             content: [
               {
                 type: 'image_url',
-                image_url: { url: dataUrl }
+                image_url: {
+                  url: dataUrl,
+                  detail: 'low'
+                }
               },
               {
                 type: 'text',
-                text: 'Определи что за блюдо или продукт на фото. Ответь ТОЛЬКО в формате JSON: {"name": "название на русском", "calories": число ккал на 100г, "protein": белки г, "fat": жиры г, "carbs": углеводы г, "confidence": уверенность 0-100}. Если не можешь определить еду — верни {"error": "not_food"}.'
+                text: 'Look at this food photo and respond ONLY with JSON (no other text): {"name": "название блюда на русском языке", "calories": number per 100g, "protein": number, "fat": number, "carbs": number, "confidence": 0-100}. If no food visible: {"error": "not_food"}'
               }
             ]
           }],
-          max_tokens: 200,
+          max_tokens: 150,
           temperature: 0.1
         })
       })
@@ -277,30 +341,41 @@ export default function FoodScan({ onBack, onMealAdded }) {
           </>
         )}
 
-        {/* Barcode input mode */}
-        {mode === 'barcode' && !result && !processing && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div className="card" style={{ textAlign: 'center', padding: 24 }}>
-              <div style={{ fontSize: 48, marginBottom: 12 }}>📦</div>
-              <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 6 }}>Введи штрихкод</div>
-              <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>Найди цифры под штрихкодом на упаковке</div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input
-                  type="number"
-                  placeholder="4607031762574"
-                  value={manualBarcode}
-                  onChange={e => setManualBarcode(e.target.value)}
-                  style={{ flex: 1, fontSize: 18, fontWeight: 700, textAlign: 'center' }}
-                  autoFocus
-                />
+        {/* Barcode scanner */}
+        {mode === 'barcode' && scanning && (
+          <div>
+            <div style={{ borderRadius: 'var(--radius)', overflow: 'hidden', position: 'relative', background: '#000', width: '100%', aspectRatio: '4/3' }}>
+              <div ref={videoRef} style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0 }} />
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+                <div style={{ width: '70%', height: 80, border: '2px solid var(--pink)', borderRadius: 8, boxShadow: '0 0 0 9999px rgba(0,0,0,0.4)' }}>
+                  <div style={{ position: 'absolute', top: -2, left: -2, width: 16, height: 16, borderTop: '3px solid var(--pink)', borderLeft: '3px solid var(--pink)', borderRadius: '4px 0 0 0' }} />
+                  <div style={{ position: 'absolute', top: -2, right: -2, width: 16, height: 16, borderTop: '3px solid var(--pink)', borderRight: '3px solid var(--pink)', borderRadius: '0 4px 0 0' }} />
+                  <div style={{ position: 'absolute', bottom: -2, left: -2, width: 16, height: 16, borderBottom: '3px solid var(--pink)', borderLeft: '3px solid var(--pink)', borderRadius: '0 0 0 4px' }} />
+                  <div style={{ position: 'absolute', bottom: -2, right: -2, width: 16, height: 16, borderBottom: '3px solid var(--pink)', borderRight: '3px solid var(--pink)', borderRadius: '0 0 4px 0' }} />
+                </div>
               </div>
-              <button
-                className="btn-primary"
-                style={{ marginTop: 12, opacity: manualBarcode.length > 4 ? 1 : 0.5 }}
-                onClick={() => manualBarcode.length > 4 && lookupBarcode(manualBarcode)}
-              >
-                🔍 Найти продукт
-              </button>
+            </div>
+            <div style={{ textAlign: 'center', padding: '12px 0', color: 'var(--text-muted)', fontSize: 13 }}>
+              Наведи штрихкод в рамку
+            </div>
+            <button className="btn-outline" onClick={resetScan}>Отмена</button>
+          </div>
+        )}
+
+        {/* Manual barcode input when not scanning */}
+        {mode === 'barcode' && !scanning && !result && !processing && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div className="card" style={{ padding: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Или введи штрихкод вручную:</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input type="number" placeholder="4607031762574" value={manualBarcode}
+                  onChange={e => setManualBarcode(e.target.value)}
+                  style={{ flex: 1, fontSize: 15 }} />
+                <button onClick={() => manualBarcode && lookupBarcode(manualBarcode)}
+                  style={{ background: 'var(--pink)', color: 'white', border: 'none', borderRadius: 10, padding: '0 16px', fontWeight: 700, cursor: 'pointer', fontFamily: 'Nunito, sans-serif' }}>
+                  Найти
+                </button>
+              </div>
             </div>
             <button className="btn-outline" onClick={resetScan}>← Назад</button>
           </div>
