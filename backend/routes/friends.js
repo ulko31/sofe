@@ -37,7 +37,7 @@ router.post('/invite', auth, (req, res) => {
   const token = Buffer.from(`${req.user.id}:${Date.now()}`).toString('base64url')
   res.json({
     token,
-    link: `https://t.me/${process.env.BOT_USERNAME || 'sofe_bot'}?start=friend_${token}`,
+    link: `https://t.me/${process.env.BOT_USERNAME}?start=friend_${token}`,
     text: `Привет! Я использую SOFE — приложение для здоровья и питания. Присоединяйся и будем следить за прогрессом вместе! 🌸`
   })
 })
