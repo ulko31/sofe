@@ -108,6 +108,83 @@ router.delete('/recipes/:id', adminAuth, (req, res) => {
   res.json({ ok: true })
 })
 
+// ── WORKOUTS ──────────────────────────────────────────────
+router.get('/workouts', adminAuth, (req, res) => {
+  res.json({ workouts: db.prepare('SELECT * FROM workouts ORDER BY id DESC').all() })
+})
+
+router.post('/workouts', adminAuth, (req, res) => {
+  const { name, type, duration, level, format, description, video_url, thumbnail_url, instructor } = req.body
+  if (!name) return res.status(400).json({ error: 'name required' })
+
+  // Add columns if not exist
+  try { db.exec('ALTER TABLE workouts ADD COLUMN video_url TEXT') } catch(e) {}
+  try { db.exec('ALTER TABLE workouts ADD COLUMN thumbnail_url TEXT') } catch(e) {}
+  try { db.exec('ALTER TABLE workouts ADD COLUMN instructor TEXT') } catch(e) {}
+
+  const result = db.prepare(`
+    INSERT INTO workouts (name, type, duration, level, format, description, video_url, thumbnail_url, instructor)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(name, type || 'FIT', duration || 30, level || 'Средний', format || 'Онлайн', description || '', video_url || '', thumbnail_url || '', instructor || '')
+  res.json(db.prepare('SELECT * FROM workouts WHERE id = ?').get(result.lastInsertRowid))
+})
+
+router.put('/workouts/:id', adminAuth, (req, res) => {
+  const { name, type, duration, level, format, description, video_url, thumbnail_url, instructor } = req.body
+  try { db.exec('ALTER TABLE workouts ADD COLUMN video_url TEXT') } catch(e) {}
+  try { db.exec('ALTER TABLE workouts ADD COLUMN thumbnail_url TEXT') } catch(e) {}
+  try { db.exec('ALTER TABLE workouts ADD COLUMN instructor TEXT') } catch(e) {}
+
+  db.prepare(`
+    UPDATE workouts SET name=?, type=?, duration=?, level=?, format=?, description=?, video_url=?, thumbnail_url=?, instructor=?
+    WHERE id=?
+  `).run(name, type, duration, level, format, description, video_url || '', thumbnail_url || '', instructor || '', req.params.id)
+  res.json(db.prepare('SELECT * FROM workouts WHERE id = ?').get(req.params.id))
+})
+
+router.delete('/workouts/:id', adminAuth, (req, res) => {
+  db.prepare('DELETE FROM workouts WHERE id = ?').run(req.params.id)
+  res.json({ ok: true })
+})
+
+// ── PLACES (студии и кафе на карте) ───────────────────────
+router.get('/places', adminAuth, (req, res) => {
+  try { db.exec(`CREATE TABLE IF NOT EXISTS places (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL, type TEXT DEFAULT 'studio',
+    address TEXT, lat REAL, lng REAL,
+    description TEXT, phone TEXT, website TEXT,
+    emoji TEXT DEFAULT '📍', color TEXT DEFAULT '#E8437A',
+    rating REAL DEFAULT 0, tags TEXT DEFAULT '[]',
+    created_at TEXT DEFAULT (datetime('now'))
+  )`) } catch(e) {}
+  const places = db.prepare('SELECT * FROM places ORDER BY type, name').all()
+  res.json({ places: places.map(p => ({ ...p, tags: JSON.parse(p.tags || '[]') })) })
+})
+
+router.post('/places', adminAuth, (req, res) => {
+  try { db.exec(`CREATE TABLE IF NOT EXISTS places (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL, type TEXT DEFAULT 'studio',
+    address TEXT, lat REAL, lng REAL,
+    description TEXT, phone TEXT, website TEXT,
+    emoji TEXT DEFAULT '📍', color TEXT DEFAULT '#E8437A',
+    rating REAL DEFAULT 0, tags TEXT DEFAULT '[]',
+    created_at TEXT DEFAULT (datetime('now'))
+  )`) } catch(e) {}
+  const { name, type, address, lat, lng, description, phone, website, emoji, color, rating, tags } = req.body
+  const result = db.prepare(`
+    INSERT INTO places (name, type, address, lat, lng, description, phone, website, emoji, color, rating, tags)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(name, type || 'studio', address || '', lat || 0, lng || 0, description || '', phone || '', website || '', emoji || '📍', color || '#E8437A', rating || 0, JSON.stringify(tags || []))
+  res.json(db.prepare('SELECT * FROM places WHERE id = ?').get(result.lastInsertRowid))
+})
+
+router.delete('/places/:id', adminAuth, (req, res) => {
+  db.prepare('DELETE FROM places WHERE id = ?').run(req.params.id)
+  res.json({ ok: true })
+})
+
 // ── NUTRITION STATS ────────────────────────────────────────
 router.get('/nutrition', adminAuth, (req, res) => {
   const today = new Date().toISOString().split('T')[0]
