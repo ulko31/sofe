@@ -48,7 +48,10 @@ db.exec(`
     duration INTEGER DEFAULT 30,
     level TEXT DEFAULT 'Средний',
     format TEXT DEFAULT 'Онлайн',
-    description TEXT
+    description TEXT,
+    video_url TEXT,
+    thumbnail_url TEXT,
+    instructor TEXT
   );
   CREATE TABLE IF NOT EXISTS user_workouts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
