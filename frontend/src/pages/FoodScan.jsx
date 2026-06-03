@@ -12,61 +12,61 @@ export default function FoodScan({ onBack, onMealAdded }) {
   const [mealType, setMealType] = useState('snack')
   const [weight, setWeight] = useState('100')
   const [manualBarcode, setManualBarcode] = useState('')
-  const videoRef = useRef(null)
+  const videoContainerRef = useRef(null)
   const fileRef = useRef(null)
-  const barcodeFileRef = useRef(null)
-  const streamRef = useRef(null)
   const quaggaRef = useRef(null)
+  const detectedRef = useRef(false)
 
-  useEffect(() => () => stopCamera(), [])
+  useEffect(() => () => stopQuagga(), [])
 
-  const stopCamera = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop())
-      streamRef.current = null
-    }
+  const stopQuagga = () => {
     if (quaggaRef.current) {
       try { quaggaRef.current.stop() } catch(e) {}
       quaggaRef.current = null
     }
+    detectedRef.current = false
   }
 
   const resetScan = () => {
-    stopCamera()
+    stopQuagga()
     setMode(null)
     setScanning(false)
     setResult(null)
     setError(null)
     setManualBarcode('')
+    detectedRef.current = false
   }
 
-  // ── BARCODE ──────────────────────────────────────────────
+  // ── BARCODE via Quagga ────────────────────────────────────
   const startBarcodeScanner = async () => {
     setMode('barcode')
     setScanning(true)
     setError(null)
     setResult(null)
+    detectedRef.current = false
 
     if (!window.Quagga) {
       try {
         await new Promise((res, rej) => {
           const s = document.createElement('script')
           s.src = 'https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js'
-          s.onload = res; s.onerror = rej
+          s.onload = res
+          s.onerror = rej
           document.head.appendChild(s)
         })
       } catch(e) {
-        setError('Не удалось загрузить сканер. Введи штрихкод вручную ниже.')
+        setError('Не удалось загрузить сканер. Введи штрихкод вручную.')
         setScanning(false)
         return
       }
     }
 
-    try {
-      const container = videoRef.current
-      const w = container.offsetWidth || 320
-      const h = Math.round(w * 0.75)
+    // Wait for DOM
+    await new Promise(r => setTimeout(r, 100))
+    const container = videoContainerRef.current
+    if (!container) { setScanning(false); return }
 
+    try {
       await new Promise((resolve, reject) => {
         window.Quagga.init({
           inputStream: {
@@ -74,34 +74,72 @@ export default function FoodScan({ onBack, onMealAdded }) {
             type: 'LiveStream',
             target: container,
             constraints: {
-              width: { ideal: w },
-              height: { ideal: h },
-              facingMode: 'environment'
+              facingMode: 'environment',
+              width: { ideal: 1280 },
+              height: { ideal: 720 }
+            },
+            area: {
+              top: '20%', right: '10%',
+              left: '10%', bottom: '20%'
             }
           },
+          locator: {
+            patchSize: 'medium',
+            halfSample: true
+          },
+          numOfWorkers: 2,
+          frequency: 10,
           decoder: {
-            readers: ['ean_reader', 'ean_8_reader', 'upc_reader', 'code_128_reader']
+            readers: [
+              'ean_reader',
+              'ean_8_reader',
+              'upc_reader',
+              'upc_e_reader',
+              'code_128_reader'
+            ]
           },
           locate: true
-        }, err => err ? reject(err) : resolve())
+        }, err => {
+          if (err) { reject(err); return }
+          resolve()
+        })
       })
 
       quaggaRef.current = window.Quagga
       window.Quagga.start()
 
-      let detected = false
       window.Quagga.onDetected(async data => {
-        if (detected) return
-        detected = true
+        if (detectedRef.current) return
         const code = data.codeResult.code
+        if (!code || code.length < 4) return
+        detectedRef.current = true
         haptic('medium')
-        window.Quagga.stop()
-        quaggaRef.current = null
+        stopQuagga()
         setScanning(false)
         await lookupBarcode(code)
       })
+
+      window.Quagga.onProcessed(result => {
+        const drawingCtx = window.Quagga.canvas.ctx.overlay
+        const drawingCanvas = window.Quagga.canvas.dom.overlay
+        if (!drawingCtx || !drawingCanvas) return
+        drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height)
+        if (result?.boxes) {
+          result.boxes.filter(b => b !== result.box).forEach(box => {
+            window.Quagga.ImageDebug.drawPath(box, { x: 0, y: 1 }, drawingCtx, { color: 'green', lineWidth: 2 })
+          })
+        }
+        if (result?.box) {
+          window.Quagga.ImageDebug.drawPath(result.box, { x: 0, y: 1 }, drawingCtx, { color: '#00F', lineWidth: 2 })
+        }
+        if (result?.codeResult?.code) {
+          window.Quagga.ImageDebug.drawPath(result.line, { x: 'x', y: 'y' }, drawingCtx, { color: 'red', lineWidth: 3 })
+        }
+      })
+
     } catch(e) {
-      setError('Не удалось запустить камеру. Введи штрихкод вручную ниже.')
+      console.error('Quagga error:', e)
+      setError('Не удалось запустить камеру. Попробуй ввести штрихкод вручную.')
       setScanning(false)
     }
   }
@@ -113,7 +151,7 @@ export default function FoodScan({ onBack, onMealAdded }) {
       const r = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`)
       const data = await r.json()
       if (data.status === 0 || !data.product) {
-        setError(`Продукт ${barcode} не найден. Попробуй другой штрихкод или введи вручную.`)
+        setError(`Продукт ${barcode} не найден. Попробуй другой штрихкод.`)
         setProcessing(false)
         return
       }
@@ -121,7 +159,7 @@ export default function FoodScan({ onBack, onMealAdded }) {
       const n = p.nutriments || {}
       setResult({
         source: 'barcode', barcode,
-        name: p.product_name_ru || p.product_name || p.generic_name || 'Неизвестный продукт',
+        name: p.product_name_ru || p.product_name || 'Неизвестный продукт',
         brand: p.brands || '',
         calories: Math.round(n['energy-kcal_100g'] || n['energy-kcal'] || 0),
         protein: Math.round((n.proteins_100g || 0) * 10) / 10,
@@ -131,7 +169,7 @@ export default function FoodScan({ onBack, onMealAdded }) {
         unit_weight: 100
       })
     } catch(e) {
-      setError('Ошибка сети. Проверь интернет и попробуй снова.')
+      setError('Ошибка сети. Проверь интернет.')
     } finally {
       setProcessing(false)
     }
@@ -154,10 +192,8 @@ export default function FoodScan({ onBack, onMealAdded }) {
       const groqToken = import.meta.env.VITE_GROQ_TOKEN
       if (!groqToken) throw new Error('no_token')
 
-      // Resize image to max 512px to reduce base64 size
       const resized = await resizeImage(file, 512)
-      const mimeType = 'image/jpeg'
-      const dataUrl = `data:${mimeType};base64,${resized}`
+      const dataUrl = `data:image/jpeg;base64,${resized}`
 
       const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
@@ -171,7 +207,7 @@ export default function FoodScan({ onBack, onMealAdded }) {
             role: 'user',
             content: [
               { type: 'image_url', image_url: { url: dataUrl, detail: 'low' } },
-              { type: 'text', text: 'What food is in this image? Reply ONLY with this JSON format, nothing else: {"name":"food name in Russian","calories":kcal_per_100g,"protein":g,"fat":g,"carbs":g}' }
+              { type: 'text', text: 'What food is in this image? Reply ONLY with JSON: {"name":"название на русском","calories":kcal_per_100g,"protein":g,"fat":g,"carbs":g}' }
             ]
           }],
           max_tokens: 100,
@@ -179,19 +215,11 @@ export default function FoodScan({ onBack, onMealAdded }) {
         })
       })
 
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}))
-        console.error('Groq Vision error:', response.status, errData)
-        throw new Error(errData.error?.message || `HTTP ${response.status}`)
-      }
-
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
       const data = await response.json()
       const text = data.choices?.[0]?.message?.content?.trim() || ''
-      console.log('Groq Vision response:', text)
-
-      const jsonMatch = text.match(/\{[^}]+\}/)
+      const jsonMatch = text.match(/\{[^{}]+\}/)
       if (!jsonMatch) throw new Error('no_json')
-
       const parsed = JSON.parse(jsonMatch[0])
 
       setResult({
@@ -207,21 +235,14 @@ export default function FoodScan({ onBack, onMealAdded }) {
       })
     } catch(e) {
       console.error('Photo error:', e.message)
-      if (e.message === 'no_token') {
-        setError('Токен Groq не настроен. Добавь VITE_GROQ_TOKEN в Vercel.')
-      } else if (e.message?.includes('401')) {
-        setError('Токен Groq недействителен. Создай новый на console.groq.com.')
-      } else if (e.message === 'no_json') {
-        setError('Не удалось распознать блюдо. Попробуй другое фото.')
-      } else {
-        setError('Ошибка: ' + e.message)
-      }
+      if (e.message === 'no_token') setError('Токен Groq не настроен.')
+      else if (e.message === 'no_json') setError('Не удалось распознать блюдо. Попробуй другое фото.')
+      else setError('Ошибка: ' + e.message)
     } finally {
       setProcessing(false)
     }
   }
 
-  // Resize image to max size using canvas
   async function resizeImage(file, maxSize) {
     return new Promise((resolve, reject) => {
       const img = new Image()
@@ -230,43 +251,15 @@ export default function FoodScan({ onBack, onMealAdded }) {
         URL.revokeObjectURL(url)
         const canvas = document.createElement('canvas')
         let w = img.width, h = img.height
-        if (w > h) { if (w > maxSize) { h = h * maxSize / w; w = maxSize } }
-        else { if (h > maxSize) { w = w * maxSize / h; h = maxSize } }
-        canvas.width = Math.round(w)
-        canvas.height = Math.round(h)
-        const ctx = canvas.getContext('2d')
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
-        const b64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1]
-        resolve(b64)
+        if (w > h) { if (w > maxSize) { h = Math.round(h * maxSize / w); w = maxSize } }
+        else { if (h > maxSize) { w = Math.round(w * maxSize / h); h = maxSize } }
+        canvas.width = w; canvas.height = h
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h)
+        resolve(canvas.toDataURL('image/jpeg', 0.8).split(',')[1])
       }
       img.onerror = reject
       img.src = url
     })
-  }
-
-  const foodTranslations = {
-    'pizza': 'Пицца', 'burger': 'Бургер', 'sushi': 'Суши', 'salad': 'Салат',
-    'pasta': 'Паста', 'soup': 'Суп', 'steak': 'Стейк', 'chicken': 'Курица',
-    'rice': 'Рис', 'bread': 'Хлеб', 'cake': 'Торт', 'ice cream': 'Мороженое',
-    'omelette': 'Омлет', 'sandwich': 'Сэндвич', 'pancake': 'Блин',
-    'french fries': 'Картофель фри', 'hot dog': 'Хот-дог', 'ramen': 'Рамен',
-    'spaghetti': 'Спагетти', 'tiramisu': 'Тирамису', 'donut': 'Пончик',
-    'waffle': 'Вафля', 'cookie': 'Печенье', 'spring rolls': 'Спринг роллы'
-  }
-
-  function translateFoodName(name) {
-    const lower = name.toLowerCase()
-    for (const [en, ru] of Object.entries(foodTranslations)) {
-      if (lower.includes(en)) return ru
-    }
-    return name.charAt(0).toUpperCase() + name.slice(1).replace(/_/g, ' ')
-  }
-
-  function estimateCalories(name) {
-    const map = { pizza: 266, burger: 295, salad: 100, pasta: 158, soup: 57, steak: 250, chicken: 165, rice: 130, bread: 265, cake: 350, 'ice cream': 207, omelette: 154, sandwich: 250, pancake: 227, 'french fries': 312 }
-    const lower = name.toLowerCase()
-    for (const [k, v] of Object.entries(map)) { if (lower.includes(k)) return v }
-    return 200
   }
 
   const handleAddMeal = async () => {
@@ -276,7 +269,7 @@ export default function FoodScan({ onBack, onMealAdded }) {
     const ratio = w / (result.unit_weight || 100)
     const today = new Date().toISOString().split('T')[0]
     try {
-      const meal = await addMeal({
+      await addMeal({
         name: result.name,
         calories: Math.round(result.calories * ratio),
         protein: Math.round(result.protein * ratio * 10) / 10,
@@ -284,11 +277,11 @@ export default function FoodScan({ onBack, onMealAdded }) {
         carbs: Math.round(result.carbs * ratio * 10) / 10,
         type: mealType, date: today
       })
-      onMealAdded?.(meal.data)
+      onMealAdded?.()
       haptic('medium')
       onBack()
     } catch(e) {
-      setError('Ошибка при добавлении. Попробуй ещё раз.')
+      setError('Ошибка при добавлении.')
     }
   }
 
@@ -297,7 +290,7 @@ export default function FoodScan({ onBack, onMealAdded }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: 'var(--bg)' }}>
       <div style={{ background: 'var(--pink)', padding: '48px 16px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button onClick={() => { stopCamera(); onBack() }} style={{ color: 'white', fontSize: 22 }}>
+        <button onClick={() => { stopQuagga(); onBack() }} style={{ color: 'white', fontSize: 22, background: 'none', border: 'none', cursor: 'pointer' }}>
           <i className="ti ti-arrow-left" />
         </button>
         <div>
@@ -308,13 +301,9 @@ export default function FoodScan({ onBack, onMealAdded }) {
 
       <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14, flex: 1 }}>
 
-        {/* Mode selection */}
-        {!mode && !result && !processing && (
+        {/* Main menu */}
+        {!mode && !processing && (
           <>
-            <div style={{ textAlign: 'center', padding: '8px 0' }}>
-              <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 4 }}>Как сканируем?</div>
-            </div>
-
             <div onClick={() => fileRef.current?.click()}
               style={{ background: 'var(--white)', borderRadius: 'var(--radius)', padding: 24, textAlign: 'center', cursor: 'pointer', border: '2px dashed var(--pink-mid)' }}>
               <div style={{ fontSize: 48, marginBottom: 12 }}>📸</div>
@@ -327,14 +316,16 @@ export default function FoodScan({ onBack, onMealAdded }) {
               style={{ background: 'var(--white)', borderRadius: 'var(--radius)', padding: 24, textAlign: 'center', cursor: 'pointer', border: '2px dashed var(--green-mid)' }}>
               <div style={{ fontSize: 48, marginBottom: 12 }}>📦</div>
               <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 4 }}>Сканировать штрихкод</div>
-              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Наведи камеру на упаковку</div>
+              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Наведи камеру на штрихкод</div>
             </div>
 
             <div className="card" style={{ padding: 16 }}>
               <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Ввести штрихкод вручную</div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <input type="number" placeholder="4607031762574" value={manualBarcode}
-                  onChange={e => setManualBarcode(e.target.value)} style={{ flex: 1, fontSize: 15 }} />
+                  onChange={e => setManualBarcode(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && manualBarcode && lookupBarcode(manualBarcode)}
+                  style={{ flex: 1, fontSize: 15 }} />
                 <button onClick={() => manualBarcode && lookupBarcode(manualBarcode)}
                   style={{ background: 'var(--pink)', color: 'white', border: 'none', borderRadius: 10, padding: '0 16px', fontWeight: 700, cursor: 'pointer', fontFamily: 'Nunito, sans-serif' }}>
                   Найти
@@ -344,101 +335,31 @@ export default function FoodScan({ onBack, onMealAdded }) {
           </>
         )}
 
-        {/* Barcode mode */}
-        {mode === 'barcode' && !result && !processing && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-
-            {/* Option 1: iOS native camera scan */}
-            <div className="card" style={{ textAlign: 'center', padding: 20, cursor: 'pointer', border: '2px dashed var(--green-mid)' }}
-              onClick={() => barcodeFileRef.current?.click()}>
-              <div style={{ fontSize: 40, marginBottom: 8 }}>📷</div>
-              <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 4 }}>Сфотографировать штрихкод</div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>iOS автоматически распознает штрихкод</div>
-              <input
-                ref={barcodeFileRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                style={{ display: 'none' }}
-                onChange={async (e) => {
-                  const file = e.target.files?.[0]
-                  if (!file) return
-                  e.target.value = ''
-                  // Try to read barcode from image using ZXing via CDN
-                  setProcessing(true)
-                  setError(null)
-                  try {
-                    if (!window.ZXing) {
-                      await new Promise((res, rej) => {
-                        const s = document.createElement('script')
-                        s.src = 'https://unpkg.com/@zxing/library@latest/umd/index.min.js'
-                        s.onload = res; s.onerror = rej
-                        document.head.appendChild(s)
-                      })
-                    }
-                    const img = new Image()
-                    const url = URL.createObjectURL(file)
-                    await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = url })
-                    const canvas = document.createElement('canvas')
-                    canvas.width = img.width; canvas.height = img.height
-                    canvas.getContext('2d').drawImage(img, 0, 0)
-                    URL.revokeObjectURL(url)
-                    const hints = new Map()
-                    const reader = new window.ZXing.MultiFormatReader()
-                    reader.setHints(hints)
-                    const luminance = new window.ZXing.HTMLCanvasElementLuminanceSource(canvas)
-                    const binaryBitmap = new window.ZXing.BinaryBitmap(new window.ZXing.HybridBinarizer(luminance))
-                    const result = reader.decode(binaryBitmap)
-                    setProcessing(false)
-                    await lookupBarcode(result.getText())
-                  } catch(e) {
-                    setProcessing(false)
-                    setError('Не удалось считать штрихкод с фото. Введи цифры вручную ниже.')
-                  }
-                }}
+        {/* Barcode scanner */}
+        {mode === 'barcode' && scanning && (
+          <div>
+            <div style={{ position: 'relative', borderRadius: 12, overflow: 'hidden', background: '#000', width: '100%', aspectRatio: '16/9' }}>
+              <div
+                ref={videoContainerRef}
+                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
               />
-            </div>
-
-            {/* Option 2: Live camera scanner */}
-            {!scanning && (
-              <div className="card" style={{ textAlign: 'center', padding: 20, cursor: 'pointer', border: '2px dashed var(--pink-mid)' }}
-                onClick={startBarcodeScanner}>
-                <div style={{ fontSize: 40, marginBottom: 8 }}>🎥</div>
-                <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 4 }}>Сканировать камерой</div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Наведи камеру на штрихкод</div>
-              </div>
-            )}
-
-            {/* Live scanner view */}
-            {scanning && (
-              <div>
-                <div style={{ borderRadius: 'var(--radius)', overflow: 'hidden', position: 'relative', background: '#000', width: '100%', aspectRatio: '4/3' }}>
-                  <div ref={videoRef} style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0 }} />
-                  <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-                    <div style={{ width: '70%', height: 80, border: '2px solid var(--pink)', borderRadius: 8 }} />
-                  </div>
+              {/* Scan frame overlay */}
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+                <div style={{ position: 'relative', width: '80%', height: 80 }}>
+                  {/* corners */}
+                  {[['0','0','borderTop','borderLeft'],['0','0','borderTop','borderRight'],['auto','0','borderBottom','borderLeft'],['auto','0','borderBottom','borderRight']].map(([t,b,bt,bl], i) => (
+                    <div key={i} style={{ position: 'absolute', ...(t==='0'?{top:0}:{bottom:0}), ...(i%2===0?{left:0}:{right:0}), width: 20, height: 20, [bt]: '3px solid var(--pink)', [bl]: '3px solid var(--pink)' }} />
+                  ))}
+                  <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: 2, background: 'rgba(232,67,122,0.6)', animation: 'scan 1.5s ease-in-out infinite' }} />
                 </div>
-                <div style={{ textAlign: 'center', padding: '10px 0', color: 'var(--text-muted)', fontSize: 13 }}>Наведи штрихкод в рамку</div>
-                <button className="btn-outline" onClick={() => { stopCamera(); setScanning(false) }}>Отмена</button>
-              </div>
-            )}
-
-            {/* Option 3: Manual input */}
-            <div className="card" style={{ padding: 14 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8 }}>Ввести цифры вручную:</div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input type="number" placeholder="4607031762574" value={manualBarcode}
-                  onChange={e => setManualBarcode(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && manualBarcode && lookupBarcode(manualBarcode)}
-                  style={{ flex: 1, fontSize: 14 }} />
-                <button onClick={() => manualBarcode && lookupBarcode(manualBarcode)}
-                  style={{ background: 'var(--pink)', color: 'white', border: 'none', borderRadius: 10, padding: '0 14px', fontWeight: 700, cursor: 'pointer', fontFamily: 'Nunito, sans-serif', fontSize: 13 }}>
-                  Найти
-                </button>
               </div>
             </div>
-
-            <button className="btn-outline" onClick={resetScan}>← Назад</button>
+            <div style={{ textAlign: 'center', padding: '12px 0', color: 'var(--text-muted)', fontSize: 13 }}>
+              Держи упаковку ровно, штрихкод в рамке
+            </div>
+            <button className="btn-outline" onClick={() => { stopQuagga(); setMode(null); setScanning(false) }}>
+              Отмена
+            </button>
           </div>
         )}
 
@@ -447,16 +368,15 @@ export default function FoodScan({ onBack, onMealAdded }) {
           <div style={{ textAlign: 'center', padding: 40 }}>
             <div className="spinner" style={{ margin: '0 auto 16px' }} />
             <div style={{ fontSize: 15, fontWeight: 700 }}>
-              {mode === 'photo' ? '🤖 ИИ распознаёт блюдо...' : '🔍 Ищем продукт...'}
+              {mode === 'photo' ? '🤖 Распознаём блюдо...' : '🔍 Ищем продукт...'}
             </div>
-            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 8 }}>Несколько секунд...</div>
           </div>
         )}
 
         {/* Error */}
         {error && !processing && (
           <div>
-            <div style={{ background: '#FEE2E2', borderRadius: 'var(--radius-sm)', padding: 16, marginBottom: 12 }}>
+            <div style={{ background: '#FEE2E2', borderRadius: 12, padding: 16, marginBottom: 12 }}>
               <div style={{ fontSize: 13, color: '#DC2626', fontWeight: 600 }}>⚠️ {error}</div>
             </div>
             <button className="btn-primary" onClick={resetScan}>Попробовать снова</button>
@@ -474,9 +394,8 @@ export default function FoodScan({ onBack, onMealAdded }) {
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 16, fontWeight: 900 }}>{result.name}</div>
                   {result.brand && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{result.brand}</div>}
-                  {result.source === 'photo' && (
-                    <div style={{ fontSize: 11, color: 'var(--green)', fontWeight: 700, marginTop: 4 }}>🤖 Уверенность: {result.confidence}%</div>
-                  )}
+                  {result.source === 'photo' && <div style={{ fontSize: 11, color: 'var(--green)', fontWeight: 700, marginTop: 4 }}>🤖 Распознано ИИ</div>}
+                  {result.barcode && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>📦 {result.barcode}</div>}
                 </div>
               </div>
 
@@ -509,28 +428,23 @@ export default function FoodScan({ onBack, onMealAdded }) {
                 ))}
               </div>
 
-              <button className="btn-primary" onClick={handleAddMeal}>
-                ✅ Добавить {calcCal()} ккал
-              </button>
+              <button className="btn-primary" onClick={handleAddMeal}>✅ Добавить {calcCal()} ккал</button>
             </div>
-
-            {result.alternatives?.length > 0 && (
-              <div className="card">
-                <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 10 }}>Другие варианты:</div>
-                {result.alternatives.map((alt, i) => (
-                  <div key={i} onClick={() => { haptic('light'); setResult(r => ({ ...r, name: translateFoodName(alt.label), confidence: Math.round(alt.score * 100) })) }}
-                    style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: i < result.alternatives.length - 1 ? '0.5px solid var(--border)' : 'none', cursor: 'pointer' }}>
-                    <span style={{ fontSize: 13 }}>{translateFoodName(alt.label)}</span>
-                    <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 700 }}>{Math.round(alt.score * 100)}%</span>
-                  </div>
-                ))}
-              </div>
-            )}
 
             <button className="btn-outline" onClick={resetScan}>Сканировать другой продукт</button>
           </div>
         )}
       </div>
+
+      <style>{`
+        @keyframes scan {
+          0% { top: 20%; }
+          50% { top: 80%; }
+          100% { top: 20%; }
+        }
+        #interactive video { width: 100% !important; height: 100% !important; object-fit: cover; }
+        #interactive canvas { width: 100% !important; height: 100% !important; position: absolute; top: 0; left: 0; }
+      `}</style>
     </div>
   )
 }
