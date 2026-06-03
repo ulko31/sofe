@@ -109,6 +109,8 @@
   <div class="nav-item" onclick="showPage('events')"><i class="ti ti-calendar"></i> Мероприятия</div>
   <div class="nav-item" onclick="showPage('recipes')"><i class="ti ti-chef-hat"></i> Рецепты</div>
   <div class="nav-item" onclick="showPage('nutrition')"><i class="ti ti-salad"></i> Питание</div>
+  <div class="nav-item" onclick="showPage('workouts_admin')"><i class="ti ti-barbell"></i> Тренировки</div>
+  <div class="nav-item" onclick="showPage('places_admin')"><i class="ti ti-map-pin"></i> Карта мест</div>
   <div class="nav-item" onclick="showPage('settings')"><i class="ti ti-settings"></i> Настройки</div>
 </div>
 
@@ -239,6 +241,45 @@
     </div>
   </div>
 
+  <!-- WORKOUTS ADMIN -->
+  <div id="page-workouts_admin" class="hidden">
+    <div class="topbar">
+      <h2>Тренировки и видео</h2>
+      <button class="btn btn-pink" onclick="openWorkoutModal()">+ Добавить тренировку</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Название</th><th>Тип</th><th>Длительность</th><th>Уровень</th><th>Инструктор</th><th>Видео</th><th>Действия</th></tr></thead>
+        <tbody id="workouts-admin-table"><tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:24px;">Загрузка...</td></tr></tbody>
+      </table>
+    </div>
+    <div style="margin-top:16px;padding:16px;background:var(--pink-light);border-radius:12px;font-size:13px;">
+      <b>💡 Как добавить видео с Google Drive:</b><br>
+      1. Загрузи видео на Google Drive<br>
+      2. Нажми правой кнопкой → "Поделиться" → "Все у кого есть ссылка"<br>
+      3. Скопируй ссылку и вставь в поле "Ссылка на видео"<br>
+      Формат: <code>https://drive.google.com/file/d/XXXX/view</code>
+    </div>
+  </div>
+
+  <!-- PLACES ADMIN -->
+  <div id="page-places_admin" class="hidden">
+    <div class="topbar">
+      <h2>Студии и кафе на карте</h2>
+      <button class="btn btn-pink" onclick="openPlaceModal()">+ Добавить место</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Место</th><th>Тип</th><th>Адрес</th><th>Рейтинг</th><th>Действия</th></tr></thead>
+        <tbody id="places-table"><tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px;">Загрузка...</td></tr></tbody>
+      </table>
+    </div>
+    <div style="margin-top:16px;padding:16px;background:var(--green-light);border-radius:12px;font-size:13px;">
+      <b>💡 Как найти координаты:</b><br>
+      Зайди на Яндекс.Карты → найди место → нажми правой кнопкой → "Что здесь?" → скопируй координаты
+    </div>
+  </div>
+
   <!-- SETTINGS -->
   <div id="page-settings" class="hidden">
     <div class="topbar"><h2>Настройки</h2></div>
@@ -255,6 +296,91 @@
         </div>
         <button class="btn btn-pink" onclick="saveSettings()">Сохранить и подключить</button>
         <div id="connection-status" style="font-size:13px;color:var(--text-muted);"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Workout Modal -->
+<div id="workout-modal" class="modal-overlay hidden">
+  <div class="modal" style="width:580px;">
+    <h3 id="workout-modal-title">Добавить тренировку</h3>
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <input type="hidden" id="workout-id">
+      <div class="form-grid">
+        <div class="form-group"><label>Название *</label><input type="text" id="workout-name" placeholder="FIT-тренировка"></div>
+        <div class="form-group"><label>Тип</label>
+          <select id="workout-type">
+            <option value="FIT">FIT</option>
+            <option value="Stretching">Stretching</option>
+            <option value="Fit ball">Fit ball</option>
+            <option value="Йога">Йога</option>
+            <option value="Пилатес">Пилатес</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Длительность (мин)</label><input type="number" id="workout-duration" placeholder="45"></div>
+        <div class="form-group"><label>Уровень</label>
+          <select id="workout-level">
+            <option value="Лёгкий">Лёгкий</option>
+            <option value="Средний">Средний</option>
+            <option value="Интенсивный">Интенсивный</option>
+            <option value="Высокий">Высокий</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Формат</label>
+          <select id="workout-format">
+            <option value="Онлайн">Онлайн</option>
+            <option value="Студия">Студия</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Инструктор</label><input type="text" id="workout-instructor" placeholder="Имя тренера"></div>
+      </div>
+      <div class="form-group">
+        <label>🎬 Ссылка на видео (Google Drive или YouTube)</label>
+        <input type="text" id="workout-video" placeholder="https://drive.google.com/file/d/XXXX/view">
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Google Drive: поделись файлом → скопируй ссылку</div>
+      </div>
+      <div class="form-group">
+        <label>🖼 Превью (URL картинки, необязательно)</label>
+        <input type="text" id="workout-thumbnail" placeholder="https://...">
+      </div>
+      <div class="form-group"><label>Описание</label><textarea id="workout-desc" rows="2" placeholder="Описание тренировки..."></textarea></div>
+      <div style="display:flex;gap:10px;margin-top:8px;">
+        <button class="btn btn-pink" style="flex:1;" onclick="saveWorkout()">Сохранить</button>
+        <button class="btn btn-outline" style="flex:1;" onclick="closeModal('workout-modal')">Отмена</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Place Modal -->
+<div id="place-modal" class="modal-overlay hidden">
+  <div class="modal" style="width:580px;">
+    <h3>Добавить место на карту</h3>
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <input type="hidden" id="place-id">
+      <div class="form-grid">
+        <div class="form-group"><label>Название *</label><input type="text" id="place-name" placeholder="ELASTICA Studio"></div>
+        <div class="form-group"><label>Тип</label>
+          <select id="place-type">
+            <option value="studio">🏋️ Студия</option>
+            <option value="cafe">🥗 Кафе / ресторан</option>
+            <option value="spa">💆 Спа / массаж</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Эмодзи</label><input type="text" id="place-emoji" placeholder="🏋️" maxlength="2"></div>
+        <div class="form-group"><label>Рейтинг (0-5)</label><input type="number" id="place-rating" placeholder="4.8" step="0.1" min="0" max="5"></div>
+        <div class="form-group"><label>Широта (lat)</label><input type="number" id="place-lat" placeholder="55.751" step="0.0001"></div>
+        <div class="form-group"><label>Долгота (lng)</label><input type="number" id="place-lng" placeholder="37.618" step="0.0001"></div>
+      </div>
+      <div class="form-group"><label>Адрес</label><input type="text" id="place-address" placeholder="ул. Тверская, 14"></div>
+      <div class="form-group"><label>Теги (через запятую)</label><input type="text" id="place-tags" placeholder="Йога, Пилатес, Растяжка"></div>
+      <div class="form-group"><label>Телефон</label><input type="text" id="place-phone" placeholder="+7 495 000-00-00"></div>
+      <div class="form-group"><label>Сайт</label><input type="text" id="place-website" placeholder="https://..."></div>
+      <div class="form-group"><label>Описание</label><textarea id="place-desc" rows="2" placeholder="Описание места..."></textarea></div>
+      <div style="display:flex;gap:10px;margin-top:8px;">
+        <button class="btn btn-pink" style="flex:1;" onclick="savePlace()">Сохранить</button>
+        <button class="btn btn-outline" style="flex:1;" onclick="closeModal('place-modal')">Отмена</button>
       </div>
     </div>
   </div>
@@ -755,6 +881,173 @@ async function loadNutrition() {
 }
 
 function closeModal(id) { document.getElementById(id).classList.add('hidden') }
+
+// ── WORKOUTS ADMIN ────────────────────────────────────────
+let allWorkoutsAdmin = []
+
+async function loadWorkoutsAdmin() {
+  try {
+    const data = await apiFetch('/admin/workouts')
+    allWorkoutsAdmin = data.workouts || []
+    document.getElementById('workouts-admin-table').innerHTML = allWorkoutsAdmin.length ? allWorkoutsAdmin.map(w => `
+      <tr>
+        <td><b>${w.name}</b></td>
+        <td>${w.type}</td>
+        <td>${w.duration} мин</td>
+        <td>${w.level}</td>
+        <td>${w.instructor || '—'}</td>
+        <td>${w.video_url ? '<span class="status status-active">✅ Есть</span>' : '<span class="status status-inactive">Нет</span>'}</td>
+        <td style="display:flex;gap:6px;">
+          <button class="btn btn-outline btn-sm" onclick="editWorkout(${w.id})">Ред.</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteWorkout(${w.id})">Удалить</button>
+        </td>
+      </tr>`).join('') : '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:24px;">Нет тренировок — добавь первую!</td></tr>'
+  } catch(e) {
+    document.getElementById('workouts-admin-table').innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:24px;">⚙️ Настрой подключение в настройках</td></tr>'
+  }
+}
+
+function openWorkoutModal(id) {
+  document.getElementById('workout-modal-title').textContent = id ? 'Редактировать тренировку' : 'Добавить тренировку'
+  const w = id ? allWorkoutsAdmin.find(x => x.id === id) : {}
+  document.getElementById('workout-id').value = w?.id || ''
+  document.getElementById('workout-name').value = w?.name || ''
+  document.getElementById('workout-type').value = w?.type || 'FIT'
+  document.getElementById('workout-duration').value = w?.duration || 30
+  document.getElementById('workout-level').value = w?.level || 'Средний'
+  document.getElementById('workout-format').value = w?.format || 'Онлайн'
+  document.getElementById('workout-instructor').value = w?.instructor || ''
+  document.getElementById('workout-video').value = w?.video_url || ''
+  document.getElementById('workout-thumbnail').value = w?.thumbnail_url || ''
+  document.getElementById('workout-desc').value = w?.description || ''
+  document.getElementById('workout-modal').classList.remove('hidden')
+}
+
+function editWorkout(id) { openWorkoutModal(id) }
+
+async function saveWorkout() {
+  const name = document.getElementById('workout-name').value.trim()
+  if (!name) { alert('Введи название'); return }
+  const data = {
+    name,
+    type: document.getElementById('workout-type').value,
+    duration: parseInt(document.getElementById('workout-duration').value) || 30,
+    level: document.getElementById('workout-level').value,
+    format: document.getElementById('workout-format').value,
+    instructor: document.getElementById('workout-instructor').value,
+    video_url: document.getElementById('workout-video').value,
+    thumbnail_url: document.getElementById('workout-thumbnail').value,
+    description: document.getElementById('workout-desc').value
+  }
+  const id = document.getElementById('workout-id').value
+  try {
+    if (id) { await apiFetch('/admin/workouts/' + id, 'PUT', data) }
+    else { await apiFetch('/admin/workouts', 'POST', data) }
+    closeModal('workout-modal')
+    loadWorkoutsAdmin()
+    showToast('✅ Тренировка сохранена!')
+  } catch(e) { alert('Ошибка: ' + e.message) }
+}
+
+async function deleteWorkout(id) {
+  if (!confirm('Удалить тренировку?')) return
+  await apiFetch('/admin/workouts/' + id, 'DELETE')
+  loadWorkoutsAdmin()
+  showToast('🗑 Удалено')
+}
+
+// ── PLACES ADMIN ──────────────────────────────────────────
+let allPlaces = []
+
+async function loadPlacesAdmin() {
+  try {
+    const data = await apiFetch('/admin/places')
+    allPlaces = data.places || []
+    const typeMap = { studio: '🏋️ Студия', cafe: '🥗 Кафе', spa: '💆 Спа' }
+    document.getElementById('places-table').innerHTML = allPlaces.length ? allPlaces.map(p => `
+      <tr>
+        <td>${p.emoji} <b>${p.name}</b></td>
+        <td>${typeMap[p.type] || p.type}</td>
+        <td style="color:var(--text-muted);font-size:12px;">${p.address || '—'}</td>
+        <td>${p.rating ? '★ ' + p.rating : '—'}</td>
+        <td style="display:flex;gap:6px;">
+          <button class="btn btn-outline btn-sm" onclick="editPlace(${p.id})">Ред.</button>
+          <button class="btn btn-danger btn-sm" onclick="deletePlace(${p.id})">Удалить</button>
+        </td>
+      </tr>`).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px;">Нет мест — добавь первое!</td></tr>'
+  } catch(e) {
+    document.getElementById('places-table').innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px;">⚙️ Настрой подключение в настройках</td></tr>'
+  }
+}
+
+function openPlaceModal(id) {
+  const p = id ? allPlaces.find(x => x.id === id) : {}
+  document.getElementById('place-id').value = p?.id || ''
+  document.getElementById('place-name').value = p?.name || ''
+  document.getElementById('place-type').value = p?.type || 'studio'
+  document.getElementById('place-address').value = p?.address || ''
+  document.getElementById('place-lat').value = p?.lat || ''
+  document.getElementById('place-lng').value = p?.lng || ''
+  document.getElementById('place-emoji').value = p?.emoji || '📍'
+  document.getElementById('place-rating').value = p?.rating || ''
+  document.getElementById('place-phone').value = p?.phone || ''
+  document.getElementById('place-website').value = p?.website || ''
+  document.getElementById('place-desc').value = p?.description || ''
+  document.getElementById('place-tags').value = (p?.tags || []).join(', ')
+  document.getElementById('place-modal').classList.remove('hidden')
+}
+
+function editPlace(id) { openPlaceModal(id) }
+
+async function savePlace() {
+  const name = document.getElementById('place-name').value.trim()
+  if (!name) { alert('Введи название'); return }
+  const data = {
+    name,
+    type: document.getElementById('place-type').value,
+    address: document.getElementById('place-address').value,
+    lat: parseFloat(document.getElementById('place-lat').value) || 0,
+    lng: parseFloat(document.getElementById('place-lng').value) || 0,
+    emoji: document.getElementById('place-emoji').value || '📍',
+    rating: parseFloat(document.getElementById('place-rating').value) || 0,
+    phone: document.getElementById('place-phone').value,
+    website: document.getElementById('place-website').value,
+    description: document.getElementById('place-desc').value,
+    tags: document.getElementById('place-tags').value.split(',').map(t => t.trim()).filter(Boolean),
+    color: document.getElementById('place-type').value === 'cafe' ? '#4CAF50' : document.getElementById('place-type').value === 'spa' ? '#9B59B6' : '#E8437A'
+  }
+  const id = document.getElementById('place-id').value
+  try {
+    if (id) { await apiFetch('/admin/places/' + id, 'PUT', data) }
+    else { await apiFetch('/admin/places', 'POST', data) }
+    closeModal('place-modal')
+    loadPlacesAdmin()
+    showToast('✅ Место сохранено!')
+  } catch(e) { alert('Ошибка: ' + e.message) }
+}
+
+async function deletePlace(id) {
+  if (!confirm('Удалить место?')) return
+  await apiFetch('/admin/places/' + id, 'DELETE')
+  loadPlacesAdmin()
+  showToast('🗑 Удалено')
+}
+
+// Patch showPage to load new sections
+const _origShowPage = showPage
+showPage = function(page) {
+  document.querySelectorAll('[id^="page-"]').forEach(el => el.classList.add('hidden'))
+  document.getElementById('page-' + page)?.classList.remove('hidden')
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'))
+  event?.currentTarget?.classList.add('active')
+  if (page === 'dashboard') loadDashboard()
+  if (page === 'users') loadUsers()
+  if (page === 'events') loadEvents()
+  if (page === 'recipes') loadRecipes()
+  if (page === 'nutrition') loadNutrition()
+  if (page === 'workouts_admin') loadWorkoutsAdmin()
+  if (page === 'places_admin') loadPlacesAdmin()
+}
 
 // Init
 document.getElementById('api-url').value = localStorage.getItem('sofe_api_url') || ''
