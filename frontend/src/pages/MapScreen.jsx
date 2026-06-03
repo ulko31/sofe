@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useTelegram } from '../hooks/useTelegram'
+import api from '../utils/api'
 
 const YANDEX_KEY = import.meta.env.VITE_YANDEX_MAPS_KEY || ''
 
@@ -33,9 +34,23 @@ export default function MapScreen({ user }) {
   const [category, setCategory] = useState('all')
   const [selected, setSelected] = useState(null)
   const [mapLoaded, setMapLoaded] = useState(false)
-  const [userLocation, setUserLocation] = useState([55.751, 37.618]) // Moscow default
+  const [userLocation, setUserLocation] = useState([55.751, 37.618])
+  const [places, setPlaces] = useState(DEMO_PLACES)
 
-  const filtered = category === 'all' ? DEMO_PLACES : DEMO_PLACES.filter(p => p.type === category)
+  // Load real places from backend
+  useEffect(() => {
+    api.get('/admin/places').then(r => {
+      if (r.data.places?.length > 0) {
+        setPlaces(r.data.places.map(p => ({
+          ...p,
+          coords: [p.lat, p.lng],
+          tags: Array.isArray(p.tags) ? p.tags : JSON.parse(p.tags || '[]')
+        })))
+      }
+    }).catch(() => {}) // keep demo places on error
+  }, [])
+
+  const filtered = category === 'all' ? places : places.filter(p => p.type === category)
 
   // Load Yandex Maps script
   useEffect(() => {
@@ -74,7 +89,7 @@ export default function MapScreen({ user }) {
       })
 
       mapInstanceRef.current = map
-      addPlacemarksToMap(map, ymaps, DEMO_PLACES)
+      addPlacemarksToMap(map, ymaps, places)
     })
   }, [mapLoaded])
 
