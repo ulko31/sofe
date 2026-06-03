@@ -40,55 +40,12 @@ export default function FoodScan({ onBack, onMealAdded }) {
   }
 
   // ── BARCODE ──────────────────────────────────────────────
-  const startBarcodeScanner = async () => {
+  const startBarcodeScanner = () => {
+    // In Telegram iOS, Quagga doesn't work well
+    // Use manual input which works everywhere
     setMode('barcode')
-    setScanning(true)
     setError(null)
     setResult(null)
-
-    if (!window.Quagga) {
-      try {
-        await new Promise((res, rej) => {
-          const s = document.createElement('script')
-          s.src = 'https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js'
-          s.onload = res; s.onerror = rej
-          document.head.appendChild(s)
-        })
-      } catch(e) {
-        setError('Не удалось загрузить сканер. Введи штрихкод вручную.')
-        setScanning(false)
-        return
-      }
-    }
-
-    try {
-      await new Promise((resolve, reject) => {
-        window.Quagga.init({
-          inputStream: {
-            name: 'Live', type: 'LiveStream',
-            target: videoRef.current,
-            constraints: { facingMode: 'environment' }
-          },
-          decoder: { readers: ['ean_reader', 'ean_8_reader', 'code_128_reader', 'upc_reader'] },
-          locate: true
-        }, err => err ? reject(err) : resolve())
-      })
-
-      quaggaRef.current = window.Quagga
-      window.Quagga.start()
-
-      window.Quagga.onDetected(async data => {
-        const code = data.codeResult.code
-        haptic('medium')
-        window.Quagga.stop()
-        quaggaRef.current = null
-        setScanning(false)
-        await lookupBarcode(code)
-      })
-    } catch(e) {
-      setError('Не удалось запустить камеру. Введи штрихкод вручную ниже.')
-      setScanning(false)
-    }
   }
 
   const lookupBarcode = async (barcode) => {
@@ -320,19 +277,32 @@ export default function FoodScan({ onBack, onMealAdded }) {
           </>
         )}
 
-        {/* Barcode scanner */}
-        {mode === 'barcode' && scanning && (
-          <div>
-            <div style={{ borderRadius: 'var(--radius)', overflow: 'hidden', position: 'relative', background: '#000', minHeight: 280 }}>
-              <div ref={videoRef} style={{ width: '100%' }} />
-              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-                <div style={{ width: 240, height: 100, border: '2px solid var(--pink)', borderRadius: 8 }} />
+        {/* Barcode input mode */}
+        {mode === 'barcode' && !result && !processing && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div className="card" style={{ textAlign: 'center', padding: 24 }}>
+              <div style={{ fontSize: 48, marginBottom: 12 }}>📦</div>
+              <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 6 }}>Введи штрихкод</div>
+              <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>Найди цифры под штрихкодом на упаковке</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  type="number"
+                  placeholder="4607031762574"
+                  value={manualBarcode}
+                  onChange={e => setManualBarcode(e.target.value)}
+                  style={{ flex: 1, fontSize: 18, fontWeight: 700, textAlign: 'center' }}
+                  autoFocus
+                />
               </div>
+              <button
+                className="btn-primary"
+                style={{ marginTop: 12, opacity: manualBarcode.length > 4 ? 1 : 0.5 }}
+                onClick={() => manualBarcode.length > 4 && lookupBarcode(manualBarcode)}
+              >
+                🔍 Найти продукт
+              </button>
             </div>
-            <div style={{ textAlign: 'center', padding: 12, color: 'var(--text-muted)', fontSize: 13 }}>
-              Наведи камеру на штрихкод
-            </div>
-            <button className="btn-outline" onClick={resetScan}>Отмена</button>
+            <button className="btn-outline" onClick={resetScan}>← Назад</button>
           </div>
         )}
 
