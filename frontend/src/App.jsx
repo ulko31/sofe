@@ -15,6 +15,18 @@ export default function App() {
   const { user } = useTelegram()
   const [tab, setTab] = useState('home')
   const [showAI, setShowAI] = useState(false)
+  const [pendingFriendToken, setPendingFriendToken] = useState(null)
+
+  useEffect(() => {
+    // Check if app was opened via friend invite link
+    const tg = window.Telegram?.WebApp
+    const startParam = tg?.initDataUnsafe?.start_param || ''
+    if (startParam.startsWith('friend_')) {
+      const token = startParam.replace('friend_', '')
+      setPendingFriendToken(token)
+      setTab('profile') // Go to profile where Friends is accessible
+    }
+  }, [])
   const [appUser, setAppUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [needsOnboarding, setNeedsOnboarding] = useState(false)
