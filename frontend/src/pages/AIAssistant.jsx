@@ -6,7 +6,7 @@ const GROQ_TOKEN = import.meta.env.VITE_GROQ_TOKEN
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
 const MODEL = 'llama-3.3-70b-versatile'
 
-function buildSystemPrompt(user, consumed) {
+function buildSystemPrompt(user, consumed, eventsText) {
   return `Ты SOFE — персональный ИИ-ассистент по здоровью и питанию. Ты дружелюбная, заботливая и мотивирующая подруга-эксперт.
 
 Данные пользователя:
@@ -15,12 +15,14 @@ function buildSystemPrompt(user, consumed) {
 - Норма калорий: ${user?.calories || 2000} ккал/день
 - Потреблено сегодня: ${consumed} ккал
 - Осталось: ${Math.max(0, (user?.calories || 2000) - consumed)} ккал
+${eventsText ? `\nПредстоящие мероприятия на платформе:\n${eventsText}` : ''}
 
 Правила:
 - ВСЕГДА отвечай только на русском языке
 - Отвечай коротко — 2-4 предложения
 - Давай конкретные советы с цифрами
 - 1-2 эмодзи на ответ
+- Если спрашивают про мероприятия — расскажи о предстоящих из списка выше
 - Никогда не давай медицинских диагнозов`
 }
 
@@ -33,7 +35,9 @@ export default function AIAssistant({ user, onBack }) {
   const [loading, setLoading] = useState(false)
   const [suggestions, setSuggestions] = useState([])
   const [todayConsumed, setTodayConsumed] = useState(0)
+  const [eventsText, setEventsText] = useState('')
   const bottomRef = useRef(null)
+  const inputRef = useRef(null)
 
   useEffect(() => {
     api.get('/ai/suggestions').then(r => setSuggestions(r.data)).catch(() => {
@@ -42,10 +46,34 @@ export default function AIAssistant({ user, onBack }) {
         '💪 Посоветуй тренировку',
         '💧 Сколько воды нужно?',
         '😴 Советы для хорошего сна',
-        '📊 Оцени мой прогресс сегодня'
+        '📅 Какие мероприятия скоро?'
       ])
     })
     api.get('/nutrition/today').then(r => setTodayConsumed(r.data.consumed || 0)).catch(() => {})
+
+    // Load upcoming events for context
+    api.get('/events/all').then(r => {
+      const events = r.data || []
+      const now = new Date()
+      const upcoming = events
+        .filter(e => new Date(e.date) >= now)
+        .slice(0, 5)
+        .map(e => `- ${e.emoji} ${e.title} (${new Date(e.date).toLocaleDateString('ru', { day: 'numeric', month: 'long' })}, ${e.time}, ${e.location})`)
+        .join('\n')
+      if (upcoming) setEventsText(upcoming)
+    }).catch(() => {
+      // Try events.json fallback
+      fetch('/events.json').then(r => r.json()).then(data => {
+        const events = data.events || []
+        const now = new Date()
+        const upcoming = events
+          .filter(e => new Date(e.date) >= now)
+          .slice(0, 5)
+          .map(e => `- ${e.emoji} ${e.title} (${new Date(e.date).toLocaleDateString('ru', { day: 'numeric', month: 'long' })}, ${e.time}, ${e.location})`)
+          .join('\n')
+        if (upcoming) setEventsText(upcoming)
+      }).catch(() => {})
+    })
   }, [])
 
   useEffect(() => {
@@ -69,7 +97,7 @@ export default function AIAssistant({ user, onBack }) {
     }
 
     const history = messages.slice(-8)
-    const systemPrompt = buildSystemPrompt(user, todayConsumed)
+    const systemPrompt = buildSystemPrompt(user, todayConsumed, eventsText)
 
     try {
       const response = await fetch(GROQ_URL, {
@@ -107,7 +135,6 @@ export default function AIAssistant({ user, onBack }) {
       let errMsg = 'Что-то пошло не так 😔 Попробуй ещё раз.'
       if (e.message === 'invalid_token') errMsg = '🔑 Токен Groq недействителен. Создай новый на console.groq.com и обнови VITE_GROQ_TOKEN на Vercel.'
       if (e.message === 'rate_limit') errMsg = '⏳ Слишком много запросов. Подожди минуту и попробуй снова.'
-      if (e.message?.includes('fetch') || e.message?.includes('network')) errMsg = '🌐 Ошибка сети. Проверь интернет-соединение.'
       setMessages(prev => [...prev, { role: 'assistant', content: errMsg }])
     } finally {
       setLoading(false)
@@ -115,9 +142,9 @@ export default function AIAssistant({ user, onBack }) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--bg)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--bg)', overflow: 'hidden' }}>
       {/* Header */}
-      <div style={{ background: 'var(--pink)', padding: '48px 16px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{ background: 'var(--pink)', padding: '48px 16px 16px', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
         <button onClick={onBack} style={{ color: 'white', fontSize: 22, padding: 4, background: 'none', border: 'none', cursor: 'pointer' }}>
           <i className="ti ti-arrow-left" />
         </button>
@@ -166,7 +193,7 @@ export default function AIAssistant({ user, onBack }) {
 
       {/* Suggestions */}
       {messages.length <= 1 && suggestions.length > 0 && (
-        <div style={{ padding: '0 16px 8px', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ padding: '0 16px 8px', display: 'flex', flexWrap: 'wrap', gap: 8, flexShrink: 0 }}>
           {suggestions.map((s, i) => (
             <button key={i} onClick={() => sendMessage(s)}
               style={{ padding: '8px 14px', borderRadius: 20, background: 'var(--white)', border: '1.5px solid var(--pink-mid)', color: 'var(--pink)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Nunito, sans-serif' }}>
@@ -176,20 +203,22 @@ export default function AIAssistant({ user, onBack }) {
         </div>
       )}
 
-      {/* Input */}
-      <div style={{ padding: '8px 16px max(24px, env(safe-area-inset-bottom))', position: 'sticky', bottom: 0, background: 'var(--white)', borderTop: '0.5px solid var(--border)', display: 'flex', gap: 10, alignItems: 'flex-end' }}>
+      {/* Input — sticky at bottom */}
+      <div style={{ background: 'var(--white)', borderTop: '0.5px solid var(--border)', padding: '12px 16px 32px', display: 'flex', gap: 10, alignItems: 'flex-end', flexShrink: 0 }}>
         <textarea
+          ref={inputRef}
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() } }}
-          placeholder="Спроси что-нибудь..."
+          placeholder="Напиши свой вопрос..."
           rows={1}
-          style={{ flex: 1, resize: 'none', borderRadius: 20, padding: '10px 16px', fontSize: 14, maxHeight: 100, lineHeight: 1.4, border: '1.5px solid var(--border)', outline: 'none', fontFamily: 'Nunito, sans-serif', background: 'var(--bg)' }}
+          style={{ flex: 1, resize: 'none', borderRadius: 20, padding: '12px 18px', fontSize: 15, maxHeight: 120, lineHeight: 1.4, border: '1.5px solid var(--pink-mid)', outline: 'none', fontFamily: 'Nunito, sans-serif', background: 'var(--bg)', color: 'var(--text)' }}
         />
-        <button onClick={() => sendMessage()}
+        <button
+          onClick={() => sendMessage()}
           disabled={!input.trim() || loading}
-          style={{ width: 42, height: 42, borderRadius: '50%', flexShrink: 0, background: input.trim() && !loading ? 'var(--pink)' : 'var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', cursor: input.trim() ? 'pointer' : 'default' }}>
-          <i className="ti ti-send" style={{ color: 'white', fontSize: 18 }} />
+          style={{ width: 46, height: 46, borderRadius: '50%', flexShrink: 0, background: input.trim() && !loading ? 'var(--pink)' : '#ddd', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', cursor: input.trim() ? 'pointer' : 'default', transition: 'background 0.2s' }}>
+          <i className="ti ti-send" style={{ color: 'white', fontSize: 20 }} />
         </button>
       </div>
 
