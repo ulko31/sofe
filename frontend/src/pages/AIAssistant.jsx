@@ -177,7 +177,7 @@ export default function AIAssistant({ user, onBack }) {
       )}
 
       {/* Input */}
-      <div style={{ padding: '8px 16px max(16px, env(safe-area-inset-bottom))', background: 'var(--white)', borderTop: '0.5px solid var(--border)', display: 'flex', gap: 10, alignItems: 'flex-end' }}>
+      <div style={{ padding: '8px 16px max(24px, env(safe-area-inset-bottom))', position: 'sticky', bottom: 0, background: 'var(--white)', borderTop: '0.5px solid var(--border)', display: 'flex', gap: 10, alignItems: 'flex-end' }}>
         <textarea
           value={input}
           onChange={e => setInput(e.target.value)}
