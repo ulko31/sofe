@@ -6,6 +6,30 @@ const MINI_APP_URL = process.env.MINI_APP_URL || 'https://your-app.netlify.app'
 
 console.log('🤖 SOFE Bot started')
 
+// Handle friend invite deep links
+bot.onText(/\/start friend_(.+)/, async (msg, match) => {
+  const token = match[1]
+  const chatId = msg.chat.id
+  const name = msg.from.first_name || 'красотка'
+
+  await bot.sendMessage(chatId,
+    `🌸 *Привет, ${name}!*
+
+Тебя приглашают дружить в SOFE!
+
+Открой приложение чтобы принять запрос и начать следить за прогрессом вместе 💪`,
+    {
+      parse_mode: 'Markdown',
+      reply_markup: {
+        inline_keyboard: [[{
+          text: '✅ Принять приглашение',
+          web_app: { url: `${MINI_APP_URL}?action=accept_friend&token=${token}` }
+        }]]
+      }
+    }
+  )
+})
+
 // /start
 bot.onText(/\/start/, async (msg) => {
   const name = msg.from.first_name || 'красотка'
