@@ -49,14 +49,13 @@ export default function Friends({ user, onBack }) {
 
   // Check if opened via invite link (Telegram passes via start_param)
   const checkInviteAction = async () => {
-    // Try Telegram WebApp start_param first
     const tg = window.Telegram?.WebApp
     const startParam = tg?.initDataUnsafe?.start_param || ''
-
-    // Also check URL params as fallback
     const urlParams = new URLSearchParams(window.location.search)
-    const urlAction = urlParams.get('action')
     const urlToken = urlParams.get('token')
+    const urlAction = urlParams.get('action')
+
+    console.log('SOFE Friends debug:', { startParam, urlToken, urlAction, initDataUnsafe: tg?.initDataUnsafe })
 
     let token = null
     if (startParam.startsWith('friend_')) {
@@ -65,19 +64,23 @@ export default function Friends({ user, onBack }) {
       token = urlToken
     }
 
-    if (token) {
-      try {
-        const res = await api.post('/friends/accept-invite', { token })
-        if (res.data.success) {
-          haptic('medium')
-          alert(`✅ Вы теперь подруги с ${res.data.friend.name}! 🌸`)
-          loadData()
-        } else if (res.data.already_friends) {
-          alert(`Вы уже подруги с ${res.data.friend?.name || 'этим пользователем'}!`)
-        }
-      } catch(e) {
-        console.error('Invite error:', e)
+    console.log('SOFE invite token:', token)
+
+    if (!token) return
+
+    try {
+      const res = await api.post('/friends/accept-invite', { token })
+      console.log('SOFE invite result:', res.data)
+      if (res.data.success) {
+        haptic('medium')
+        alert(`✅ Вы теперь подруги с ${res.data.friend.name}! 🌸`)
+        loadData()
+      } else if (res.data.already_friends) {
+        alert(`Вы уже подруги с ${res.data.friend?.name || 'этим пользователем'}!`)
       }
+    } catch(e) {
+      console.error('SOFE Invite error:', e.response?.data || e.message)
+      alert('Ошибка: ' + (e.response?.data?.error || e.message))
     }
   }
 
