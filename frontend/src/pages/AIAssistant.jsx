@@ -38,6 +38,26 @@ export default function AIAssistant({ user, onBack }) {
   const [showSuggestions, setShowSuggestions] = useState(true)
   const bottomRef = useRef(null)
   const messagesRef = useRef(null)
+  const [keyboardHeight, setKeyboardHeight] = useState(0)
+
+  useEffect(() => {
+    const handleViewport = () => {
+      if (window.visualViewport) {
+        const kbHeight = window.innerHeight - window.visualViewport.height
+        setKeyboardHeight(Math.max(0, kbHeight))
+        // Scroll to bottom when keyboard opens
+        if (kbHeight > 100) {
+          setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
+        }
+      }
+    }
+    window.visualViewport?.addEventListener('resize', handleViewport)
+    window.visualViewport?.addEventListener('scroll', handleViewport)
+    return () => {
+      window.visualViewport?.removeEventListener('resize', handleViewport)
+      window.visualViewport?.removeEventListener('scroll', handleViewport)
+    }
+  }, [])
 
   useEffect(() => {
     api.get('/ai/suggestions').then(r => setSuggestions(r.data)).catch(() => {
@@ -180,7 +200,7 @@ export default function AIAssistant({ user, onBack }) {
       )}
 
       {/* Input */}
-      <div style={{ background: 'var(--white)', borderTop: '0.5px solid var(--border)', padding: '10px 16px 28px', display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0, position: 'sticky', bottom: 0, zIndex: 10 }}>
+      <div style={{ background: 'var(--white)', borderTop: '0.5px solid var(--border)', padding: '10px 16px 16px', display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0, position: 'sticky', bottom: 0, zIndex: 10, marginBottom: keyboardHeight > 0 ? 0 : 0 }}>
         <input
           value={input}
           onChange={e => setInput(e.target.value)}
