@@ -2,11 +2,12 @@ import { useState, useEffect, useRef } from 'react'
 import { useTelegram } from '../hooks/useTelegram'
 import api from '../utils/api'
 
-const HF_TOKEN = import.meta.env.VITE_HF_TOKEN
-const MODEL = 'mistralai/Mistral-7B-Instruct-v0.3'
+const GROQ_TOKEN = import.meta.env.VITE_GROQ_TOKEN
+const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
+const MODEL = 'llama3-8b-8192'
 
 function buildSystemPrompt(user, consumed) {
-  return `Ты SOFE — персональный ИИ-ассистент по здоровью и питанию. Ты дружелюбная, заботливая и мотивирующая подруга-эксперт. Всегда отвечай на русском языке.
+  return `Ты SOFE — персональный ИИ-ассистент по здоровью и питанию. Ты дружелюбная, заботливая и мотивирующая подруга-эксперт.
 
 Данные пользователя:
 - Имя: ${user?.name || 'пользователь'}
@@ -16,11 +17,11 @@ function buildSystemPrompt(user, consumed) {
 - Осталось: ${Math.max(0, (user?.calories || 2000) - consumed)} ккал
 
 Правила:
+- ВСЕГДА отвечай только на русском языке
 - Отвечай коротко — 2-4 предложения
 - Давай конкретные советы с цифрами
 - 1-2 эмодзи на ответ
-- Никогда не давай медицинских диагнозов
-- Только русский язык`
+- Никогда не давай медицинских диагнозов`
 }
 
 export default function AIAssistant({ user, onBack }) {
@@ -35,9 +36,14 @@ export default function AIAssistant({ user, onBack }) {
   const bottomRef = useRef(null)
 
   useEffect(() => {
-    // Load suggestions and today stats
     api.get('/ai/suggestions').then(r => setSuggestions(r.data)).catch(() => {
-      setSuggestions(['🥗 Что съесть на обед?', '💪 Посоветуй тренировку', '💧 Сколько воды нужно?', '😴 Советы для сна'])
+      setSuggestions([
+        '🥗 Что съесть на обед?',
+        '💪 Посоветуй тренировку',
+        '💧 Сколько воды нужно?',
+        '😴 Советы для хорошего сна',
+        '📊 Оцени мой прогресс сегодня'
+      ])
     })
     api.get('/nutrition/today').then(r => setTodayConsumed(r.data.consumed || 0)).catch(() => {})
   }, [])
@@ -56,62 +62,53 @@ export default function AIAssistant({ user, onBack }) {
     const userMsg = { role: 'user', content: msg }
     setMessages(prev => [...prev, userMsg])
 
-    if (!HF_TOKEN) {
-      setMessages(prev => [...prev, { role: 'assistant', content: '⚙️ Токен HuggingFace не настроен. Добавь VITE_HF_TOKEN в переменные Vercel.' }])
+    if (!GROQ_TOKEN) {
+      setMessages(prev => [...prev, { role: 'assistant', content: '⚙️ Токен Groq не настроен. Добавь VITE_GROQ_TOKEN в переменные Vercel.' }])
       setLoading(false)
       return
     }
 
-    const history = messages.slice(-6)
+    const history = messages.slice(-8)
     const systemPrompt = buildSystemPrompt(user, todayConsumed)
 
-    const apiMessages = [
-      { role: 'system', content: systemPrompt },
-      ...history,
-      userMsg
-    ]
-
     try {
-      const response = await fetch(
-        `https://api-inference.huggingface.co/models/${MODEL}/v1/chat/completions`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${HF_TOKEN}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            model: MODEL,
-            messages: apiMessages,
-            max_tokens: 300,
-            temperature: 0.7
-          })
-        }
-      )
-
-      if (response.status === 503) {
-        setMessages(prev => [...prev, { role: 'assistant', content: '⏳ Модель загружается, подожди 20-30 секунд и напиши снова.' }])
-        setLoading(false)
-        return
-      }
+      const response = await fetch(GROQ_URL, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${GROQ_TOKEN}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: MODEL,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            ...history,
+            userMsg
+          ],
+          max_tokens: 400,
+          temperature: 0.7
+        })
+      })
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`)
+        const errData = await response.json().catch(() => ({}))
+        if (response.status === 401) throw new Error('invalid_token')
+        if (response.status === 429) throw new Error('rate_limit')
+        throw new Error(errData.error?.message || `HTTP ${response.status}`)
       }
 
       const data = await response.json()
       const reply = data.choices?.[0]?.message?.content?.trim()
-
-      if (!reply) throw new Error('Empty response')
+      if (!reply) throw new Error('empty')
 
       setMessages(prev => [...prev, { role: 'assistant', content: reply }])
     } catch(e) {
-      console.error('AI error:', e)
-      if (e.message?.includes('401') || e.message?.includes('403')) {
-        setMessages(prev => [...prev, { role: 'assistant', content: '🔑 Токен HuggingFace недействителен. Создай новый на huggingface.co/settings/tokens и обнови VITE_HF_TOKEN на Vercel.' }])
-      } else {
-        setMessages(prev => [...prev, { role: 'assistant', content: 'Что-то пошло не так 😔 Попробуй ещё раз.' }])
-      }
+      console.error('Groq error:', e.message)
+      let errMsg = 'Что-то пошло не так 😔 Попробуй ещё раз.'
+      if (e.message === 'invalid_token') errMsg = '🔑 Токен Groq недействителен. Создай новый на console.groq.com и обнови VITE_GROQ_TOKEN на Vercel.'
+      if (e.message === 'rate_limit') errMsg = '⏳ Слишком много запросов. Подожди минуту и попробуй снова.'
+      if (e.message?.includes('fetch') || e.message?.includes('network')) errMsg = '🌐 Ошибка сети. Проверь интернет-соединение.'
+      setMessages(prev => [...prev, { role: 'assistant', content: errMsg }])
     } finally {
       setLoading(false)
     }
@@ -121,13 +118,13 @@ export default function AIAssistant({ user, onBack }) {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--bg)' }}>
       {/* Header */}
       <div style={{ background: 'var(--pink)', padding: '48px 16px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button onClick={onBack} style={{ color: 'white', fontSize: 22, padding: 4 }}>
+        <button onClick={onBack} style={{ color: 'white', fontSize: 22, padding: 4, background: 'none', border: 'none', cursor: 'pointer' }}>
           <i className="ti ti-arrow-left" />
         </button>
         <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>🤖</div>
         <div>
           <div style={{ color: 'white', fontWeight: 800, fontSize: 16 }}>SOFE ИИ-ассистент</div>
-          <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12 }}>Эксперт по питанию и здоровью</div>
+          <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12 }}>на базе Llama 3 · Groq</div>
         </div>
       </div>
 
@@ -143,8 +140,9 @@ export default function AIAssistant({ user, onBack }) {
               borderRadius: msg.role === 'user' ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
               background: msg.role === 'user' ? 'var(--pink)' : 'var(--white)',
               color: msg.role === 'user' ? 'white' : 'var(--text)',
-              fontSize: 14, lineHeight: 1.5,
-              border: msg.role === 'assistant' ? '0.5px solid var(--border)' : 'none'
+              fontSize: 14, lineHeight: 1.6,
+              border: msg.role === 'assistant' ? '0.5px solid var(--border)' : 'none',
+              whiteSpace: 'pre-wrap'
             }}>
               {msg.content}
             </div>
@@ -166,7 +164,7 @@ export default function AIAssistant({ user, onBack }) {
         <div ref={bottomRef} />
       </div>
 
-      {/* Quick suggestions */}
+      {/* Suggestions */}
       {messages.length <= 1 && suggestions.length > 0 && (
         <div style={{ padding: '0 16px 8px', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           {suggestions.map((s, i) => (
