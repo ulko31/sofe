@@ -11,7 +11,8 @@ const CATEGORIES = [
   { id: 'all', label: 'Все', icon: '🗺' },
   { id: 'studio', label: 'Студии', icon: '🏋️' },
   { id: 'cafe', label: 'Кафе', icon: '🥗' },
-  { id: 'spa', label: 'Спа', icon: '💆' }
+  { id: 'spa', label: 'Спа', icon: '💆' },
+  { id: 'friends', label: 'Подруги', icon: '👯' }
 ]
 
 // Demo places — replaced by real ones from admin
@@ -34,6 +35,15 @@ export default function MapScreen({ user }) {
   const [userLocation, setUserLocation] = useState(DEFAULT_CENTER)
   const [places, setPlaces] = useState(DEMO_PLACES)
 
+  const [friends, setFriends] = useState([])
+
+  // Load friends with location
+  useEffect(() => {
+    api.get('/friends').then(r => {
+      setFriends((r.data || []).filter(f => f.share_location && f.lat))
+    }).catch(() => {})
+  }, [])
+
   // Load real places from backend
   useEffect(() => {
     api.get('/admin/places').then(r => {
@@ -47,7 +57,17 @@ export default function MapScreen({ user }) {
     }).catch(() => {})
   }, [])
 
-  const filtered = category === 'all' ? places : places.filter(p => p.type === category)
+  const friendPlaces = friends.map(f => ({
+    id: 'f_' + f.id, type: 'friends',
+    name: f.name || f.username || 'Подруга',
+    address: 'Онлайн · обновлено недавно',
+    coords: [parseFloat(f.lat), parseFloat(f.lng)],
+    color: '#FF9800', emoji: '👩',
+    tags: [f.goal ? 'Цель: ' + f.goal : 'SOFE'],
+    rating: 0
+  }))
+  const allItems = [...places, ...friendPlaces]
+  const filtered = category === 'all' ? allItems : category === 'friends' ? friendPlaces : places.filter(p => p.type === category)
 
   // Load Yandex Maps
   useEffect(() => {
