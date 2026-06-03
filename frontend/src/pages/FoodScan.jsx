@@ -14,6 +14,7 @@ export default function FoodScan({ onBack, onMealAdded }) {
   const [manualBarcode, setManualBarcode] = useState('')
   const videoRef = useRef(null)
   const fileRef = useRef(null)
+  const barcodeFileRef = useRef(null)
   const streamRef = useRef(null)
   const quaggaRef = useRef(null)
 
@@ -343,42 +344,100 @@ export default function FoodScan({ onBack, onMealAdded }) {
           </>
         )}
 
-        {/* Barcode scanner */}
-        {mode === 'barcode' && scanning && (
-          <div>
-            <div style={{ borderRadius: 'var(--radius)', overflow: 'hidden', position: 'relative', background: '#000', width: '100%', aspectRatio: '4/3' }}>
-              <div ref={videoRef} style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0 }} />
-              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-                <div style={{ width: '70%', height: 80, border: '2px solid var(--pink)', borderRadius: 8, boxShadow: '0 0 0 9999px rgba(0,0,0,0.4)' }}>
-                  <div style={{ position: 'absolute', top: -2, left: -2, width: 16, height: 16, borderTop: '3px solid var(--pink)', borderLeft: '3px solid var(--pink)', borderRadius: '4px 0 0 0' }} />
-                  <div style={{ position: 'absolute', top: -2, right: -2, width: 16, height: 16, borderTop: '3px solid var(--pink)', borderRight: '3px solid var(--pink)', borderRadius: '0 4px 0 0' }} />
-                  <div style={{ position: 'absolute', bottom: -2, left: -2, width: 16, height: 16, borderBottom: '3px solid var(--pink)', borderLeft: '3px solid var(--pink)', borderRadius: '0 0 0 4px' }} />
-                  <div style={{ position: 'absolute', bottom: -2, right: -2, width: 16, height: 16, borderBottom: '3px solid var(--pink)', borderRight: '3px solid var(--pink)', borderRadius: '0 0 4px 0' }} />
-                </div>
-              </div>
-            </div>
-            <div style={{ textAlign: 'center', padding: '12px 0', color: 'var(--text-muted)', fontSize: 13 }}>
-              Наведи штрихкод в рамку
-            </div>
-            <button className="btn-outline" onClick={resetScan}>Отмена</button>
-          </div>
-        )}
-
-        {/* Manual barcode input when not scanning */}
-        {mode === 'barcode' && !scanning && !result && !processing && (
+        {/* Barcode mode */}
+        {mode === 'barcode' && !result && !processing && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div className="card" style={{ padding: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Или введи штрихкод вручную:</div>
+
+            {/* Option 1: iOS native camera scan */}
+            <div className="card" style={{ textAlign: 'center', padding: 20, cursor: 'pointer', border: '2px dashed var(--green-mid)' }}
+              onClick={() => barcodeFileRef.current?.click()}>
+              <div style={{ fontSize: 40, marginBottom: 8 }}>📷</div>
+              <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 4 }}>Сфотографировать штрихкод</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>iOS автоматически распознает штрихкод</div>
+              <input
+                ref={barcodeFileRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                style={{ display: 'none' }}
+                onChange={async (e) => {
+                  const file = e.target.files?.[0]
+                  if (!file) return
+                  e.target.value = ''
+                  // Try to read barcode from image using ZXing via CDN
+                  setProcessing(true)
+                  setError(null)
+                  try {
+                    if (!window.ZXing) {
+                      await new Promise((res, rej) => {
+                        const s = document.createElement('script')
+                        s.src = 'https://unpkg.com/@zxing/library@latest/umd/index.min.js'
+                        s.onload = res; s.onerror = rej
+                        document.head.appendChild(s)
+                      })
+                    }
+                    const img = new Image()
+                    const url = URL.createObjectURL(file)
+                    await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = url })
+                    const canvas = document.createElement('canvas')
+                    canvas.width = img.width; canvas.height = img.height
+                    canvas.getContext('2d').drawImage(img, 0, 0)
+                    URL.revokeObjectURL(url)
+                    const hints = new Map()
+                    const reader = new window.ZXing.MultiFormatReader()
+                    reader.setHints(hints)
+                    const luminance = new window.ZXing.HTMLCanvasElementLuminanceSource(canvas)
+                    const binaryBitmap = new window.ZXing.BinaryBitmap(new window.ZXing.HybridBinarizer(luminance))
+                    const result = reader.decode(binaryBitmap)
+                    setProcessing(false)
+                    await lookupBarcode(result.getText())
+                  } catch(e) {
+                    setProcessing(false)
+                    setError('Не удалось считать штрихкод с фото. Введи цифры вручную ниже.')
+                  }
+                }}
+              />
+            </div>
+
+            {/* Option 2: Live camera scanner */}
+            {!scanning && (
+              <div className="card" style={{ textAlign: 'center', padding: 20, cursor: 'pointer', border: '2px dashed var(--pink-mid)' }}
+                onClick={startBarcodeScanner}>
+                <div style={{ fontSize: 40, marginBottom: 8 }}>🎥</div>
+                <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 4 }}>Сканировать камерой</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Наведи камеру на штрихкод</div>
+              </div>
+            )}
+
+            {/* Live scanner view */}
+            {scanning && (
+              <div>
+                <div style={{ borderRadius: 'var(--radius)', overflow: 'hidden', position: 'relative', background: '#000', width: '100%', aspectRatio: '4/3' }}>
+                  <div ref={videoRef} style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0 }} />
+                  <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+                    <div style={{ width: '70%', height: 80, border: '2px solid var(--pink)', borderRadius: 8 }} />
+                  </div>
+                </div>
+                <div style={{ textAlign: 'center', padding: '10px 0', color: 'var(--text-muted)', fontSize: 13 }}>Наведи штрихкод в рамку</div>
+                <button className="btn-outline" onClick={() => { stopCamera(); setScanning(false) }}>Отмена</button>
+              </div>
+            )}
+
+            {/* Option 3: Manual input */}
+            <div className="card" style={{ padding: 14 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8 }}>Ввести цифры вручную:</div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <input type="number" placeholder="4607031762574" value={manualBarcode}
                   onChange={e => setManualBarcode(e.target.value)}
-                  style={{ flex: 1, fontSize: 15 }} />
+                  onKeyDown={e => e.key === 'Enter' && manualBarcode && lookupBarcode(manualBarcode)}
+                  style={{ flex: 1, fontSize: 14 }} />
                 <button onClick={() => manualBarcode && lookupBarcode(manualBarcode)}
-                  style={{ background: 'var(--pink)', color: 'white', border: 'none', borderRadius: 10, padding: '0 16px', fontWeight: 700, cursor: 'pointer', fontFamily: 'Nunito, sans-serif' }}>
+                  style={{ background: 'var(--pink)', color: 'white', border: 'none', borderRadius: 10, padding: '0 14px', fontWeight: 700, cursor: 'pointer', fontFamily: 'Nunito, sans-serif', fontSize: 13 }}>
                   Найти
                 </button>
               </div>
             </div>
+
             <button className="btn-outline" onClick={resetScan}>← Назад</button>
           </div>
         )}
