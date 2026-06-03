@@ -18,15 +18,36 @@ export default function App() {
   const [pendingFriendToken, setPendingFriendToken] = useState(null)
 
   useEffect(() => {
-    // Check if app was opened via friend invite link
     const tg = window.Telegram?.WebApp
     const startParam = tg?.initDataUnsafe?.start_param || ''
+    console.log('App startParam:', startParam)
+
     if (startParam.startsWith('friend_')) {
       const token = startParam.replace('friend_', '')
       setPendingFriendToken(token)
-      setTab('profile') // Go to profile where Friends is accessible
+      // Auto-accept invite when user is loaded
     }
   }, [])
+
+  // Auto-accept friend invite when user is ready
+  useEffect(() => {
+    if (!pendingFriendToken || !appUser) return
+    const doAccept = async () => {
+      try {
+        const res = await import('./utils/api').then(m => m.default.post('/friends/accept-invite', { token: pendingFriendToken }))
+        setPendingFriendToken(null)
+        if (res.data.success) {
+          alert(`✅ Вы теперь подруги с ${res.data.friend.name}! 🌸`)
+        } else if (res.data.already_friends) {
+          alert(`Вы уже подруги с ${res.data.friend?.name || 'пользователем'}!`)
+        }
+      } catch(e) {
+        console.error('Auto-accept error:', e.response?.data || e.message)
+        setPendingFriendToken(null)
+      }
+    }
+    doAccept()
+  }, [pendingFriendToken, appUser])
   const [appUser, setAppUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [needsOnboarding, setNeedsOnboarding] = useState(false)
