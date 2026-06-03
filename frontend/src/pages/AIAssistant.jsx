@@ -142,7 +142,7 @@ export default function AIAssistant({ user, onBack }) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--bg)', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: 'var(--bg)', overflow: 'hidden' }}>
       {/* Header */}
       <div style={{ background: 'var(--pink)', padding: '48px 16px 16px', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
         <button onClick={onBack} style={{ color: 'white', fontSize: 22, padding: 4, background: 'none', border: 'none', cursor: 'pointer' }}>
@@ -193,10 +193,10 @@ export default function AIAssistant({ user, onBack }) {
 
       {/* Suggestions */}
       {messages.length <= 1 && suggestions.length > 0 && (
-        <div style={{ padding: '0 16px 8px', display: 'flex', flexWrap: 'wrap', gap: 8, flexShrink: 0 }}>
+        <div style={{ padding: '0 16px 8px', display: 'flex', overflowX: 'auto', gap: 8, flexShrink: 0 }}>
           {suggestions.map((s, i) => (
             <button key={i} onClick={() => sendMessage(s)}
-              style={{ padding: '8px 14px', borderRadius: 20, background: 'var(--white)', border: '1.5px solid var(--pink-mid)', color: 'var(--pink)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Nunito, sans-serif' }}>
+              style={{ padding: '8px 14px', borderRadius: 20, background: 'var(--white)', border: '1.5px solid var(--pink-mid)', color: 'var(--pink)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Nunito, sans-serif', whiteSpace: 'nowrap', flexShrink: 0 }}>
               {s}
             </button>
           ))}
@@ -204,7 +204,7 @@ export default function AIAssistant({ user, onBack }) {
       )}
 
       {/* Input — sticky at bottom */}
-      <div style={{ background: 'var(--white)', borderTop: '0.5px solid var(--border)', padding: '12px 16px 32px', display: 'flex', gap: 10, alignItems: 'flex-end', flexShrink: 0 }}>
+      <div style={{ background: 'var(--white)', borderTop: '0.5px solid var(--border)', padding: '12px 16px max(32px, env(safe-area-inset-bottom))', display: 'flex', gap: 10, alignItems: 'flex-end', flexShrink: 0 }}>
         <textarea
           ref={inputRef}
           value={input}
