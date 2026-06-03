@@ -42,12 +42,13 @@ export default function App() {
   const screens = { home: Home, workouts: Workouts, nutrition: Nutrition, map: MapScreen, calendar: Calendar, profile: Profile }
   const Screen = screens[tab]
 
-  // Check if current screen should hide bottom nav
-  const hideNav = false // Profile handles AI internally
+  if (showAI) {
+    return <AIAssistant user={appUser} onBack={() => setShowAI(false)} />
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      <Screen user={appUser} tgUser={user} onTabChange={setTab} />
+      <Screen user={appUser} tgUser={user} onTabChange={setTab} onOpenAI={() => setShowAI(true)} />
       <BottomNav active={tab} onChange={setTab} />
     </div>
   )
