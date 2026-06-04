@@ -10,7 +10,6 @@ import MapScreen from './pages/MapScreen'
 import Calendar from './pages/Calendar'
 import Onboarding from './pages/Onboarding'
 import AIAssistant from './pages/AIAssistant'
-import api from './utils/api'
 
 export default function App() {
   const { user } = useTelegram()
