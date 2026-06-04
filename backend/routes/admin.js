@@ -156,9 +156,11 @@ router.get('/places', adminAuth, (req, res) => {
     description TEXT, phone TEXT, website TEXT,
     emoji TEXT DEFAULT '📍', color TEXT DEFAULT '#E8437A',
     rating REAL DEFAULT 0, tags TEXT DEFAULT '[]',
+    parent_id INTEGER DEFAULT NULL,
     created_at TEXT DEFAULT (datetime('now'))
   )`) } catch(e) {}
-  const places = db.prepare('SELECT * FROM places ORDER BY type, name').all()
+  try { db.exec('ALTER TABLE places ADD COLUMN parent_id INTEGER DEFAULT NULL') } catch(e) {}
+  const places = db.prepare('SELECT * FROM places ORDER BY name').all()
   res.json({ places: places.map(p => ({ ...p, tags: JSON.parse(p.tags || '[]') })) })
 })
 
@@ -170,17 +172,31 @@ router.post('/places', adminAuth, (req, res) => {
     description TEXT, phone TEXT, website TEXT,
     emoji TEXT DEFAULT '📍', color TEXT DEFAULT '#E8437A',
     rating REAL DEFAULT 0, tags TEXT DEFAULT '[]',
+    parent_id INTEGER DEFAULT NULL,
     created_at TEXT DEFAULT (datetime('now'))
   )`) } catch(e) {}
-  const { name, type, address, lat, lng, description, phone, website, emoji, color, rating, tags } = req.body
+  try { db.exec('ALTER TABLE places ADD COLUMN parent_id INTEGER DEFAULT NULL') } catch(e) {}
+  const { name, type, address, lat, lng, description, phone, website, emoji, color, rating, tags, parent_id } = req.body
   const result = db.prepare(`
-    INSERT INTO places (name, type, address, lat, lng, description, phone, website, emoji, color, rating, tags)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(name, type || 'studio', address || '', lat || 0, lng || 0, description || '', phone || '', website || '', emoji || '📍', color || '#E8437A', rating || 0, JSON.stringify(tags || []))
+    INSERT INTO places (name, type, address, lat, lng, description, phone, website, emoji, color, rating, tags, parent_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(name, type || 'studio', address || '', parseFloat(lat) || 0, parseFloat(lng) || 0, description || '', phone || '', website || '', emoji || '📍', color || '#E8437A', parseFloat(rating) || 0, JSON.stringify(tags || []), parent_id || null)
   res.json(db.prepare('SELECT * FROM places WHERE id = ?').get(result.lastInsertRowid))
 })
 
+router.put('/places/:id', adminAuth, (req, res) => {
+  try { db.exec('ALTER TABLE places ADD COLUMN parent_id INTEGER DEFAULT NULL') } catch(e) {}
+  const { name, type, address, lat, lng, description, phone, website, emoji, color, rating, tags, parent_id } = req.body
+  db.prepare(`
+    UPDATE places SET name=?, type=?, address=?, lat=?, lng=?, description=?, phone=?, website=?, emoji=?, color=?, rating=?, tags=?, parent_id=?
+    WHERE id=?
+  `).run(name, type, address || '', parseFloat(lat) || 0, parseFloat(lng) || 0, description || '', phone || '', website || '', emoji || '📍', color || '#E8437A', parseFloat(rating) || 0, JSON.stringify(tags || []), parent_id || null, req.params.id)
+  res.json(db.prepare('SELECT * FROM places WHERE id = ?').get(req.params.id))
+})
+
 router.delete('/places/:id', adminAuth, (req, res) => {
+  // Also delete child locations
+  db.prepare('DELETE FROM places WHERE parent_id = ?').run(req.params.id)
   db.prepare('DELETE FROM places WHERE id = ?').run(req.params.id)
   res.json({ ok: true })
 })
