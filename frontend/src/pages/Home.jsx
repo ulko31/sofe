@@ -4,7 +4,7 @@ import { searchLocalFoods } from '../utils/commonFoods'
 import { useTelegram } from '../hooks/useTelegram'
 import FoodScan from './FoodScan'
 
-export default function Home({ user }) {
+export default function Home({ user, onOpenAI, onTabChange }) {
   const { haptic } = useTelegram()
   const [stats, setStats] = useState({ consumed: 0, goal: 2000, burned: 0, protein: 0, fat: 0, carbs: 0 })
   const [trackers, setTrackers] = useState({ water: 0, steps: 0, sleep: 0, pulse: 0 })
