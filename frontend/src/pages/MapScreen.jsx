@@ -3,8 +3,6 @@ import { useTelegram } from '../hooks/useTelegram'
 import api from '../utils/api'
 
 const YANDEX_KEY = import.meta.env.VITE_YANDEX_MAPS_KEY || ''
-
-// Default city center — Moscow
 const DEFAULT_CENTER = [55.751, 37.618]
 
 const CATEGORIES = [
@@ -15,16 +13,6 @@ const CATEGORIES = [
   { id: 'friends', label: 'Подруги', icon: '👯' }
 ]
 
-// Demo places — replaced by real ones from admin
-const DEMO_PLACES = [
-  { id: 1, type: 'studio', name: 'ELASTICA Studio', address: 'ул. Тверская, 14', rating: 4.9, coords: [55.762, 37.606], color: '#E8437A', emoji: '🏋️', tags: ['Пилатес', 'Йога', 'Стретчинг'] },
-  { id: 2, type: 'studio', name: 'ForMe Fitness', address: 'Кутузовский пр., 22', rating: 4.7, coords: [55.743, 37.558], color: '#E8437A', emoji: '💪', tags: ['FIT', 'Кардио'] },
-  { id: 3, type: 'studio', name: 'NF Studio', address: 'ул. Арбат, 35', rating: 4.8, coords: [55.750, 37.592], color: '#E8437A', emoji: '🧘', tags: ['Йога', 'Медитация'] },
-  { id: 4, type: 'cafe', name: 'Здоровое меню', address: 'Большая Никитская, 10', rating: 4.6, coords: [55.757, 37.601], color: '#4CAF50', emoji: '🥗', tags: ['ПП еда', 'Смузи'] },
-  { id: 5, type: 'cafe', name: 'GreenPoint', address: 'ул. Маросейка, 7', rating: 4.8, coords: [55.757, 37.638], color: '#4CAF50', emoji: '🌿', tags: ['Вегетарианское'] },
-  { id: 6, type: 'spa', name: 'Relax Spa', address: 'ул. Мясницкая, 24', rating: 4.9, coords: [55.763, 37.635], color: '#9B59B6', emoji: '💆', tags: ['Массаж'] }
-]
-
 export default function MapScreen({ user }) {
   const { haptic } = useTelegram()
   const mapRef = useRef(null)
@@ -33,63 +21,69 @@ export default function MapScreen({ user }) {
   const [selected, setSelected] = useState(null)
   const [mapLoaded, setMapLoaded] = useState(false)
   const [userLocation, setUserLocation] = useState(DEFAULT_CENTER)
-  const [places, setPlaces] = useState(DEMO_PLACES)
-
+  const [places, setPlaces] = useState([])
   const [friends, setFriends] = useState([])
+  const [loading, setLoading] = useState(true)
 
-  // Load friends with location
+  // Load places from public API
   useEffect(() => {
+    api.get('/places').then(r => {
+      setPlaces(Array.isArray(r.data) ? r.data.map(p => ({
+        ...p,
+        coords: [parseFloat(p.lat) || 0, parseFloat(p.lng) || 0],
+        tags: Array.isArray(p.tags) ? p.tags : JSON.parse(p.tags || '[]')
+      })).filter(p => p.coords[0] !== 0) : [])
+    }).catch(() => setPlaces([])).finally(() => setLoading(false))
+
     api.get('/friends').then(r => {
-      setFriends((r.data || []).filter(f => f.share_location && f.lat))
+      setFriends((r.data || []).filter(f => f.share_location && f.lat && parseFloat(f.lat) !== 0))
     }).catch(() => {})
   }, [])
 
-  // Load real places from backend
-  useEffect(() => {
-    api.get('/admin/places').then(r => {
-      if (r.data?.places?.length > 0) {
-        setPlaces(r.data.places.map(p => ({
-          ...p,
-          coords: [parseFloat(p.lat) || DEFAULT_CENTER[0], parseFloat(p.lng) || DEFAULT_CENTER[1]],
-          tags: Array.isArray(p.tags) ? p.tags : JSON.parse(p.tags || '[]')
-        })))
-      }
-    }).catch(() => {})
-  }, [])
+  // Group places by parent (for chains)
+  const groupedPlaces = places.reduce((acc, p) => {
+    if (!p.parent_id) {
+      if (!acc[p.id]) acc[p.id] = { ...p, branches: [] }
+    } else {
+      if (!acc[p.parent_id]) acc[p.parent_id] = { branches: [] }
+      acc[p.parent_id].branches = acc[p.parent_id].branches || []
+      acc[p.parent_id].branches.push(p)
+    }
+    return acc
+  }, {})
+  const placesGrouped = Object.values(groupedPlaces).filter(p => p.name)
 
   const friendPlaces = friends.map(f => ({
     id: 'f_' + f.id, type: 'friends',
     name: f.name || f.username || 'Подруга',
-    address: 'Онлайн · обновлено недавно',
+    address: 'Обновлено недавно',
     coords: [parseFloat(f.lat), parseFloat(f.lng)],
-    color: '#FF9800', emoji: '👩',
-    tags: [f.goal ? 'Цель: ' + f.goal : 'SOFE'],
-    rating: 0
+    color: '#FF9800', emoji: '👩', tags: [], rating: 0, branches: []
   }))
-  const allItems = [...places, ...friendPlaces]
-  const filtered = category === 'all' ? allItems : category === 'friends' ? friendPlaces : places.filter(p => p.type === category)
+
+  const allItems = [...placesGrouped, ...friendPlaces]
+  const filtered = category === 'all' ? allItems
+    : category === 'friends' ? friendPlaces
+    : placesGrouped.filter(p => p.type === category)
 
   // Load Yandex Maps
   useEffect(() => {
+    if (!YANDEX_KEY) return
     if (window.ymaps) { setMapLoaded(true); return }
-    if (!YANDEX_KEY) { setMapLoaded(true); return }
     const script = document.createElement('script')
     script.src = `https://api-maps.yandex.ru/2.1/?apikey=${YANDEX_KEY}&lang=ru_RU`
     script.async = true
-    script.onload = () => window.ymaps.ready(() => setMapLoaded(true))
+    script.onload = () => window.ymaps?.ready(() => setMapLoaded(true))
     script.onerror = () => setMapLoaded(true)
     document.head.appendChild(script)
   }, [])
 
-  // Try geolocation
+  // Geolocation
   useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        pos => setUserLocation([pos.coords.latitude, pos.coords.longitude]),
-        () => setUserLocation(DEFAULT_CENTER),
-        { timeout: 5000 }
-      )
-    }
+    navigator.geolocation?.getCurrentPosition(
+      pos => setUserLocation([pos.coords.latitude, pos.coords.longitude]),
+      () => {}, { timeout: 5000 }
+    )
   }, [])
 
   // Init map
@@ -97,38 +91,44 @@ export default function MapScreen({ user }) {
     if (!mapLoaded || !mapRef.current || mapInstanceRef.current || !window.ymaps || !YANDEX_KEY) return
     window.ymaps.ready(() => {
       const map = new window.ymaps.Map(mapRef.current, {
-        center: userLocation,
-        zoom: 13,
-        controls: ['zoomControl']
+        center: userLocation, zoom: 13, controls: ['zoomControl']
       })
       mapInstanceRef.current = map
-      renderMarkers(map, places)
+      renderMarkers(map, filtered)
     })
   }, [mapLoaded])
 
-  // Update markers when category or places change
   useEffect(() => {
     if (!mapInstanceRef.current || !window.ymaps) return
     mapInstanceRef.current.geoObjects.removeAll()
     renderMarkers(mapInstanceRef.current, filtered)
-  }, [category, places])
+  }, [category, places, friends])
 
   function renderMarkers(map, items) {
-    // User location
-    const userMark = new window.ymaps.Placemark(userLocation, {}, {
-      preset: 'islands#pinkCircleDotIcon'
-    })
+    const userMark = new window.ymaps.Placemark(userLocation, {}, { preset: 'islands#pinkCircleDotIcon' })
     map.geoObjects.add(userMark)
 
     items.forEach(place => {
-      if (!place.coords?.[0] || !place.coords?.[1]) return
+      if (!place.coords?.[0]) return
       const mark = new window.ymaps.Placemark(
         place.coords,
-        { balloonContentHeader: place.name, balloonContentBody: place.address, hintContent: place.name },
+        { balloonContentHeader: place.name, balloonContentBody: place.address },
         { preset: 'islands#circleDotIcon', iconColor: place.color || '#E8437A' }
       )
       mark.events.add('click', () => { haptic('light'); setSelected(place) })
       map.geoObjects.add(mark)
+
+      // Add branch markers too
+      ;(place.branches || []).forEach(branch => {
+        if (!branch.lat || parseFloat(branch.lat) === 0) return
+        const bMark = new window.ymaps.Placemark(
+          [parseFloat(branch.lat), parseFloat(branch.lng)],
+          { balloonContentHeader: place.name, balloonContentBody: branch.address },
+          { preset: 'islands#circleDotIcon', iconColor: place.color || '#E8437A' }
+        )
+        bMark.events.add('click', () => { haptic('light'); setSelected(place) })
+        map.geoObjects.add(bMark)
+      })
     })
   }
 
@@ -155,31 +155,17 @@ export default function MapScreen({ user }) {
         </div>
       </div>
 
-      {/* Map */}
+      {/* Map or list */}
       <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
         {YANDEX_KEY ? (
           <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
         ) : (
-          // Fallback — simple list view when no API key
-          <div style={{ padding: 16, overflowY: 'auto', height: '100%', background: 'var(--bg)' }}>
+          <div style={{ padding: 16, overflowY: 'auto', height: '100%' }}>
             <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 12, textAlign: 'center' }}>
-              🗺 Для отображения карты добавь VITE_YANDEX_MAPS_KEY
+              🗺 Добавь VITE_YANDEX_MAPS_KEY для карты
             </div>
-            {filtered.map(place => (
-              <div key={place.id} className="card" style={{ marginBottom: 10, cursor: 'pointer' }} onClick={() => setSelected(place)}>
-                <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                  <div style={{ fontSize: 28 }}>{place.emoji}</div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 800, fontSize: 14 }}>{place.name}</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{place.address}</div>
-                    {place.rating > 0 && <div style={{ fontSize: 11, color: '#FFB347', marginTop: 2 }}>★ {place.rating}</div>}
-                  </div>
-                </div>
-              </div>
-            ))}
           </div>
         )}
-
         {!mapLoaded && YANDEX_KEY && (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
             <div className="spinner" />
@@ -188,23 +174,41 @@ export default function MapScreen({ user }) {
         )}
       </div>
 
-      {/* Places list */}
-      {!selected && filtered.length > 0 && (
-        <div style={{ background: 'var(--white)', borderTop: '0.5px solid var(--border)', flexShrink: 0, paddingBottom: 70 }}>
-          <div style={{ padding: '10px 16px 4px', fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>
-            {filtered.length} мест
-          </div>
-          <div style={{ display: 'flex', gap: 10, overflowX: 'auto', padding: '4px 16px 12px' }}>
-            {filtered.map(place => (
-              <div key={place.id} onClick={() => handlePlaceClick(place)}
-                style={{ flexShrink: 0, width: 130, background: 'var(--bg)', borderRadius: 'var(--radius-sm)', padding: 12, cursor: 'pointer', border: '0.5px solid var(--border)' }}>
-                <div style={{ fontSize: 24, marginBottom: 6 }}>{place.emoji}</div>
-                <div style={{ fontSize: 12, fontWeight: 800, lineHeight: 1.3 }}>{place.name}</div>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 3 }}>{place.address}</div>
-                {place.rating > 0 && <div style={{ fontSize: 11, color: '#FFB347', marginTop: 4, fontWeight: 700 }}>★ {place.rating}</div>}
+      {/* Places cards - horizontal scroll */}
+      {!selected && (
+        <div style={{ background: 'var(--white)', borderTop: '0.5px solid var(--border)', flexShrink: 0, paddingBottom: 80 }}>
+          {loading ? (
+            <div style={{ padding: '12px 16px', color: 'var(--text-muted)', fontSize: 13 }}>Загрузка...</div>
+          ) : filtered.length === 0 ? (
+            <div style={{ padding: '16px', textAlign: 'center' }}>
+              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                {category === 'friends' ? '👯 Нет подруг с геолокацией' : '📍 Нет мест в этой категории'}
               </div>
-            ))}
-          </div>
+              {category !== 'friends' && (
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>Добавь места через Панель администратора</div>
+              )}
+            </div>
+          ) : (
+            <>
+              <div style={{ padding: '10px 16px 4px', fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>
+                {filtered.length} мест{filtered.length !== 1 ? '' : 'о'}
+              </div>
+              <div style={{ display: 'flex', gap: 10, overflowX: 'auto', padding: '4px 16px 12px' }}>
+                {filtered.map(place => (
+                  <div key={place.id} onClick={() => handlePlaceClick(place)}
+                    style={{ flexShrink: 0, width: 140, background: 'var(--bg)', borderRadius: 12, padding: 12, cursor: 'pointer', border: '0.5px solid var(--border)' }}>
+                    <div style={{ fontSize: 24, marginBottom: 6 }}>{place.emoji}</div>
+                    <div style={{ fontSize: 12, fontWeight: 800, lineHeight: 1.3 }}>{place.name}</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{place.address}</div>
+                    {place.rating > 0 && <div style={{ fontSize: 11, color: '#FFB347', marginTop: 4, fontWeight: 700 }}>★ {place.rating}</div>}
+                    {place.branches?.length > 0 && (
+                      <div style={{ fontSize: 10, color: 'var(--pink)', marginTop: 4, fontWeight: 700 }}>+{place.branches.length} адреса</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -212,52 +216,54 @@ export default function MapScreen({ user }) {
       {selected && (
         <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'var(--white)', borderRadius: '20px 20px 0 0', padding: 20, boxShadow: '0 -4px 20px rgba(0,0,0,0.1)', zIndex: 10, paddingBottom: 'max(20px, env(safe-area-inset-bottom))' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-              <div style={{ width: 48, height: 48, borderRadius: 12, background: selected.type === 'cafe' ? 'var(--green-light)' : selected.type === 'spa' ? '#F3E5F5' : 'var(--pink-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center', flex: 1 }}>
+              <div style={{ width: 48, height: 48, borderRadius: 12, background: selected.type === 'cafe' ? 'var(--green-light)' : selected.type === 'spa' ? '#F3E5F5' : selected.type === 'friends' ? '#FFF3E0' : 'var(--pink-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 }}>
                 {selected.emoji}
               </div>
-              <div>
+              <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 16, fontWeight: 900 }}>{selected.name}</div>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{selected.address}</div>
+                {selected.rating > 0 && <div style={{ fontSize: 12, color: '#FFB347', marginTop: 2 }}>★ {selected.rating}</div>}
               </div>
             </div>
-            <button onClick={() => setSelected(null)} style={{ color: 'var(--text-muted)', fontSize: 20, background: 'none', border: 'none', cursor: 'pointer' }}>
+            <button onClick={() => setSelected(null)} style={{ color: 'var(--text-muted)', fontSize: 20, background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
               <i className="ti ti-x" />
             </button>
           </div>
 
-          {selected.rating > 0 && (
-            <div style={{ marginBottom: 10 }}>
-              <span className="badge" style={{ background: '#FFF9E6', color: '#E65100', fontSize: 12 }}>★ {selected.rating}</span>
+          {/* Branches */}
+          {selected.branches?.length > 0 && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 6 }}>Адреса:</div>
+              {[{ address: selected.address, lat: selected.coords?.[0], lng: selected.coords?.[1] }, ...selected.branches].map((b, i) => (
+                <div key={i} onClick={() => { if (mapInstanceRef.current && b.lat) mapInstanceRef.current.setCenter([parseFloat(b.lat), parseFloat(b.lng)], 16) }}
+                  style={{ fontSize: 12, padding: '6px 0', borderBottom: i < selected.branches.length ? '0.5px solid var(--border)' : 'none', cursor: 'pointer', color: 'var(--text)' }}>
+                  📍 {b.address}
+                </div>
+              ))}
             </div>
           )}
 
-          <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
-            {(selected.tags || []).map(tag => (
-              <span key={tag} className="badge badge-pink" style={{ fontSize: 11 }}>{tag}</span>
-            ))}
-          </div>
+          {(selected.tags || []).length > 0 && (
+            <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+              {selected.tags.map(tag => <span key={tag} className="badge badge-pink" style={{ fontSize: 11 }}>{tag}</span>)}
+            </div>
+          )}
 
           {selected.description && (
-            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 14, lineHeight: 1.5 }}>{selected.description}</div>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 12, lineHeight: 1.5 }}>{selected.description}</div>
           )}
 
           <div style={{ display: 'flex', gap: 10 }}>
-            <button
-              onClick={() => { haptic('medium'); window.open(`https://yandex.ru/maps/?rtext=~${selected.coords[0]},${selected.coords[1]}&rtt=auto`, '_blank') }}
+            <button onClick={() => { haptic('medium'); window.open(`https://yandex.ru/maps/?rtext=~${selected.coords[0]},${selected.coords[1]}&rtt=auto`, '_blank') }}
               className="btn-primary" style={{ flex: 1 }}>
-              <i className="ti ti-navigation" style={{ marginRight: 6 }} />
-              Маршрут
+              <i className="ti ti-navigation" style={{ marginRight: 6 }} /> Маршрут
             </button>
             {selected.phone && (
-              <button onClick={() => window.open(`tel:${selected.phone}`)} className="btn-outline" style={{ flex: 1 }}>
-                Позвонить
-              </button>
+              <button onClick={() => window.open(`tel:${selected.phone}`)} className="btn-outline" style={{ flex: 1 }}>Позвонить</button>
             )}
-            {!selected.phone && (
-              <button onClick={() => haptic('light')} className="btn-outline" style={{ flex: 1 }}>
-                Записаться
-              </button>
+            {selected.website && (
+              <button onClick={() => window.open(selected.website, '_blank')} className="btn-outline" style={{ flex: 1 }}>Сайт</button>
             )}
           </div>
         </div>
