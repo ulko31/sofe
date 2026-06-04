@@ -243,15 +243,14 @@ export default function Friends({ user, onBack }) {
                           📍 На карте
                         </button>
                       )}
-                      <button onClick={(e) => { e.stopPropagation(); haptic('light'); setTab('invite_event_' + friend.id) }}
-                        style={{ padding: '8px 14px', borderRadius: 10, background: 'var(--pink-light)', border: 'none', color: 'var(--pink)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Nunito, sans-serif' }}
-                        onClick={(e) => { e.stopPropagation(); haptic('light')
+                      <button onClick={(e) => { e.stopPropagation(); haptic('light')
                           if (events.length === 0) { alert('Нет предстоящих мероприятий'); return }
                           const names = events.map((ev, i) => `${i+1}. ${ev.emoji} ${ev.title}`).join('\n')
                           const idx = prompt(`Выбери мероприятие (введи номер):\n${names}`)
                           const ev = events[parseInt(idx) - 1]
                           if (ev) handleInviteToEvent(friend.id, ev)
-                        }}>
+                        }}
+                        style={{ padding: '8px 14px', borderRadius: 10, background: 'var(--pink-light)', border: 'none', color: 'var(--pink)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Nunito, sans-serif' }}>
                         📅 Пригласить на событие
                       </button>
                       <button onClick={(e) => { e.stopPropagation(); handleRemove(friend.id) }}
