@@ -146,7 +146,9 @@ export default function AIAssistant({ user, onBack }) {
         <button onClick={onBack} style={{ color: 'white', fontSize: 22, background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
           <i className="ti ti-arrow-left" />
         </button>
-        <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>🤖</div>
+        <div style={{ width: 44, height: 44, flexShrink: 0 }}>
+          <img src="/mascot.svg" alt="SOFE" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+        </div>
         <div>
           <div style={{ color: 'white', fontWeight: 800, fontSize: 16 }}>SOFE ИИ-ассистент</div>
           <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12 }}>на базе Llama 3 · Groq</div>
@@ -158,7 +160,9 @@ export default function AIAssistant({ user, onBack }) {
         {messages.map((msg, i) => (
           <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
             {msg.role === 'assistant' && (
-              <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--pink-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, marginRight: 8, flexShrink: 0, alignSelf: 'flex-end' }}>🤖</div>
+              <div style={{ width: 36, height: 36, marginRight: 8, flexShrink: 0, alignSelf: 'flex-end' }}>
+              <img src="/mascot.svg" alt="SOFE" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+            </div>
             )}
             <div style={{
               maxWidth: '78%', padding: '10px 14px',
@@ -176,7 +180,9 @@ export default function AIAssistant({ user, onBack }) {
 
         {loading && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--pink-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>🤖</div>
+            <div style={{ width: 36, height: 36, flexShrink: 0 }}>
+              <img src="/mascot.svg" alt="SOFE" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+            </div>
             <div style={{ background: 'var(--white)', borderRadius: '18px 18px 18px 4px', padding: '12px 16px', border: '0.5px solid var(--border)' }}>
               <div style={{ display: 'flex', gap: 4 }}>
                 {[0,1,2].map(j => <div key={j} style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--pink)', animation: `bounce 1s ${j*0.2}s infinite` }} />)}
