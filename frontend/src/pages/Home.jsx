@@ -180,13 +180,13 @@ export default function Home({ user, onOpenAI, onTabChange }) {
             {new Date().toLocaleDateString('ru', { weekday: 'long', day: 'numeric', month: 'long' })}
           </p>
         </div>
-        <div style={{ width: 64, height: 64, flexShrink: 0, cursor: 'pointer' }} onClick={() => onOpenAI?.()}>
-          <img src="/mascot.svg" alt="SOFE" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+        <div style={{ width: 64, height: 64, flexShrink: 0, cursor: 'pointer', background: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(232,67,122,0.15)' }} onClick={() => onOpenAI?.()}>
+          <img src="/mascot.svg" alt="SOFE" style={{ width: '85%', height: '85%', objectFit: 'contain' }} />
         </div>
       </div>
 
       {/* Calories card */}
-      <div style={{ background: 'linear-gradient(135deg, #f06aa8 0%, #e84389 100%)', borderRadius: 'var(--radius)', padding: 18, color: 'white', position: 'relative', overflow: 'hidden' }}>
+      <div style={{ background: 'var(--pink)', borderRadius: 'var(--radius)', padding: 18, color: 'white', position: 'relative', overflow: 'hidden' }}>
         <div style={{ position: 'absolute', right: -20, top: -20, width: 100, height: 100, borderRadius: '50%', background: 'rgba(255,255,255,0.1)' }} />
         <div style={{ position: 'absolute', right: 20, bottom: -30, width: 80, height: 80, borderRadius: '50%', background: 'rgba(255,255,255,0.08)' }} />
         <div style={{ display: 'flex', justifyContent: 'space-between', position: 'relative', zIndex: 1 }}>
@@ -217,9 +217,9 @@ export default function Home({ user, onOpenAI, onTabChange }) {
       {/* Trackers */}
       <div>
         {/* AI Assistant quick access */}
-        <div onClick={() => onOpenAI?.()} style={{ background: 'linear-gradient(135deg, #f472b6 0%, #ec4899 100%)', borderRadius: 'var(--radius)', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', marginBottom: 4 }}>
-          <div style={{ width: 44, height: 44, flexShrink: 0, overflow: 'hidden' }}>
-              <img src="/mascot.svg" alt="SOFE" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+        <div onClick={() => onOpenAI?.()} style={{ background: 'var(--pink)', borderRadius: 'var(--radius)', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', marginBottom: 4 }}>
+          <div style={{ width: 44, height: 44, flexShrink: 0, background: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <img src="/mascot.svg" alt="SOFE" style={{ width: '85%', height: '85%', objectFit: 'contain' }} />
             </div>
           <div style={{ flex: 1 }}>
             <div style={{ color: 'white', fontWeight: 800, fontSize: 14 }}>SOFE ИИ-ассистент</div>
@@ -499,10 +499,11 @@ function RecipesPreview() {
   const [recipes, setRecipes] = useState([])
 
   useEffect(() => {
-    fetch(import.meta.env.VITE_API_URL + '/recipes')
-      .then(r => r.json())
-      .then(data => setRecipes(Array.isArray(data) ? data.slice(0, 4) : []))
-      .catch(() => {})
+    import('../utils/api').then(m => {
+      m.default.get('/recipes')
+        .then(r => setRecipes(Array.isArray(r.data) ? r.data.slice(0, 4) : []))
+        .catch(() => {})
+    })
   }, [])
 
   if (recipes.length === 0) return (
