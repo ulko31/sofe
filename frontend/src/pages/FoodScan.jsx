@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useTelegram } from '../hooks/useTelegram'
 import { addMeal, searchFoods } from '../utils/api'
 
-export default function FoodScan({ onBack, onMealAdded }) {
+export default function FoodScan({ onBack, onMealAdded, initialMode }) {
   const { haptic } = useTelegram()
   const [mode, setMode] = useState(null)
   const [processing, setProcessing] = useState(false)
@@ -18,6 +18,15 @@ export default function FoodScan({ onBack, onMealAdded }) {
   const detectedRef = useRef(false)
 
   useEffect(() => () => stopQuagga(), [])
+
+  useEffect(() => {
+    if (initialMode === 'photo') {
+      // Auto-open camera for photo
+      setTimeout(() => fileRef.current?.click(), 300)
+    } else if (initialMode === 'barcode') {
+      setMode('barcode')
+    }
+  }, [initialMode])
 
   const stopQuagga = () => {
     if (quaggaRef.current) {
@@ -308,7 +317,7 @@ export default function FoodScan({ onBack, onMealAdded }) {
               style={{ background: 'var(--white)', borderRadius: 'var(--radius)', padding: 24, textAlign: 'center', cursor: 'pointer', border: '2px dashed var(--pink-mid)' }}>
               <div style={{ fontSize: 48, marginBottom: 12 }}>📸</div>
               <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 4 }}>Сфотографировать блюдо</div>
-              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>ИИ распознает и посчитает калории</div>
+              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>ИИ определит калории и БЖУ</div>
               <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handlePhotoSelect} style={{ display: 'none' }} />
             </div>
 
