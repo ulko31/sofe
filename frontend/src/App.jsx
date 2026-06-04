@@ -38,9 +38,22 @@ export default function App() {
 
   // Check friend invite on start
   useEffect(() => {
-    const startParam = window.Telegram?.WebApp?.initDataUnsafe?.start_param || ''
+    const tg = window.Telegram?.WebApp
+    const startParam = tg?.initDataUnsafe?.start_param || ''
+    const initData = tg?.initData || ''
+    
+    // Try to extract start_param from initData string as fallback
+    let token = null
     if (startParam.startsWith('friend_')) {
-      setPendingFriendToken(startParam.replace('friend_', ''))
+      token = startParam.replace('friend_', '')
+    } else if (initData.includes('start_param=friend_')) {
+      const match = initData.match(/start_param=friend_([^&]+)/)
+      if (match) token = decodeURIComponent(match[1])
+    }
+    
+    if (token) {
+      console.log('Friend invite token found:', token)
+      setPendingFriendToken(token)
     }
   }, [])
 
