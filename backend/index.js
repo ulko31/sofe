@@ -33,6 +33,7 @@ app.use('/api', miscRoutes)
 app.get('/health', (req, res) => res.json({ ok: true, version: '1.0.0' }))
 app.get('/api/health', (req, res) => res.json({ ok: true, version: '1.0.0' }))
 
-// Bot and notifications run in bot.js separately
+// Start bot with notifications
+require('./bot')
 
 app.listen(PORT, () => console.log(`🚀 SOFE Backend running on port ${PORT}`))
