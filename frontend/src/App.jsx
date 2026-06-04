@@ -41,18 +41,27 @@ export default function App() {
     const tg = window.Telegram?.WebApp
     const startParam = tg?.initDataUnsafe?.start_param || ''
     const initData = tg?.initData || ''
-    
-    // Try to extract start_param from initData string as fallback
+
     let token = null
+
+    // Check start_param (via bot link)
     if (startParam.startsWith('friend_')) {
       token = startParam.replace('friend_', '')
-    } else if (initData.includes('start_param=friend_')) {
-      const match = initData.match(/start_param=friend_([^&]+)/)
+    }
+    // Check initData string fallback
+    else if (initData.includes('start_param=friend_')) {
+      const match = initData.match(/start_param=friend_([^&\s]+)/)
       if (match) token = decodeURIComponent(match[1])
     }
-    
+    // Check URL param ?invite= (for unregistered users)
+    else {
+      const urlParams = new URLSearchParams(window.location.search)
+      const inviteToken = urlParams.get('invite')
+      if (inviteToken) token = inviteToken
+    }
+
     if (token) {
-      console.log('Friend invite token found:', token)
+      console.log('Friend token:', token)
       setPendingFriendToken(token)
     }
   }, [])
