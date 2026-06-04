@@ -227,7 +227,7 @@ export default function MapScreen({ user }) {
 
       {/* Selected place card */}
       {selected && (
-        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'var(--white)', borderRadius: '20px 20px 0 0', padding: 20, boxShadow: '0 -4px 20px rgba(0,0,0,0.1)', zIndex: 10, paddingBottom: 'max(20px, env(safe-area-inset-bottom))' }}>
+        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'var(--white)', borderRadius: '20px 20px 0 0', padding: 20, boxShadow: '0 -4px 20px rgba(0,0,0,0.1)', zIndex: 10, paddingBottom: 'max(90px, env(safe-area-inset-bottom))' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
             <div style={{ display: 'flex', gap: 12, alignItems: 'center', flex: 1 }}>
               <div style={{ width: 48, height: 48, borderRadius: 12, background: selected.type === 'cafe' ? 'var(--green-light)' : selected.type === 'spa' ? '#F3E5F5' : selected.type === 'friends' ? '#FFF3E0' : 'var(--pink-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 }}>
