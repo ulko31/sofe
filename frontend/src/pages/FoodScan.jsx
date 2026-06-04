@@ -313,12 +313,24 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
         {/* Main menu */}
         {!mode && !processing && (
           <>
-            <div onClick={() => fileRef.current?.click()}
-              style={{ background: 'var(--white)', borderRadius: 'var(--radius)', padding: 24, textAlign: 'center', cursor: 'pointer', border: '2px dashed var(--pink-mid)' }}>
-              <div style={{ fontSize: 48, marginBottom: 12 }}>📸</div>
-              <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 4 }}>Сфотографировать блюдо</div>
-              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>ИИ определит калории и БЖУ</div>
-              <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handlePhotoSelect} style={{ display: 'none' }} />
+            {/* Camera input - iOS uses capture, Android gets choice */}
+            <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handlePhotoSelect} style={{ display: 'none' }} />
+            <input id="file-gallery" type="file" accept="image/*" onChange={handlePhotoSelect} style={{ display: 'none' }} />
+
+            <div style={{ background: 'var(--white)', borderRadius: 'var(--radius)', padding: 20, border: '2px dashed var(--pink-mid)' }}>
+              <div style={{ fontSize: 40, marginBottom: 8, textAlign: 'center' }}>📸</div>
+              <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 4, textAlign: 'center' }}>Распознать по фото</div>
+              <div style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center', marginBottom: 14 }}>ИИ определит калории и БЖУ</div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button onClick={() => fileRef.current?.click()}
+                  style={{ flex: 1, padding: '10px', borderRadius: 10, background: 'var(--pink)', color: 'white', border: 'none', fontFamily: 'Nunito, sans-serif', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+                  📷 Камера
+                </button>
+                <button onClick={() => document.getElementById('file-gallery').click()}
+                  style={{ flex: 1, padding: '10px', borderRadius: 10, background: 'var(--bg)', color: 'var(--text)', border: '1.5px solid var(--border)', fontFamily: 'Nunito, sans-serif', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+                  🖼 Галерея
+                </button>
+              </div>
             </div>
 
             <div onClick={startBarcodeScanner}
