@@ -10,7 +10,7 @@ router.get('/me', auth, (req, res) => {
 
 // PUT /api/user/profile
 router.put('/profile', auth, (req, res) => {
-  const { name, calories, goal, activity, onboarded, telegram_id } = req.body
+  const { name, calories, goal, activity, onboarded, telegram_id, age, weight, height, gender } = req.body
 
   if (telegram_id && !req.user) {
     const existing = db.prepare('SELECT * FROM users WHERE telegram_id = ?').get(String(telegram_id))
@@ -20,15 +20,27 @@ router.put('/profile', auth, (req, res) => {
     }
   }
 
+  // Add columns if not exist
+  try { db.exec('ALTER TABLE users ADD COLUMN age INTEGER') } catch(e) {}
+  try { db.exec('ALTER TABLE users ADD COLUMN weight REAL') } catch(e) {}
+  try { db.exec('ALTER TABLE users ADD COLUMN height REAL') } catch(e) {}
+  try { db.exec("ALTER TABLE users ADD COLUMN gender TEXT DEFAULT female") } catch(e) {}
+
   db.prepare(`
     UPDATE users SET
       name = COALESCE(?, name),
       calories = COALESCE(?, calories),
       goal = COALESCE(?, goal),
       activity = COALESCE(?, activity),
-      onboarded = COALESCE(?, onboarded)
+      onboarded = COALESCE(?, onboarded),
+      age = COALESCE(?, age),
+      weight = COALESCE(?, weight),
+      height = COALESCE(?, height),
+      gender = COALESCE(?, gender)
     WHERE id = ?
-  `).run(name || null, calories || null, goal || null, activity || null, onboarded ? 1 : null, req.user.id)
+  `).run(name || null, calories || null, goal || null, activity || null,
+    onboarded ? 1 : null, age || null, weight || null, height || null,
+    gender || null, req.user.id)
 
   const updated = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id)
   res.json({ user: updated })
