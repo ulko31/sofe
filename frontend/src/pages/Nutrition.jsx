@@ -8,16 +8,16 @@ const deliveryServices = [
   { id: 'imeal', name: 'iMeal', emoji: '🥩', period: '6 месяцев' }
 ]
 
-export default function Nutrition() {
+export default function Nutrition({ user }) {
   const { haptic } = useTelegram()
-  const [stats, setStats] = useState({ consumed: 0, goal: 2000, protein: 0, fat: 0, carbs: 0 })
+  const [stats, setStats] = useState({ consumed: 0, goal: user?.calories || 2000, protein: 0, fat: 0, carbs: 0 })
   const [recipes, setRecipes] = useState([])
   const [selectedDelivery, setSelectedDelivery] = useState(null)
   const [selectedRecipe, setSelectedRecipe] = useState(null)
   const [activeTag, setActiveTag] = useState('Все')
 
   useEffect(() => {
-    getTodayStats().then(r => setStats(r.data)).catch(() => {})
+    getTodayStats().then(r => setStats({ ...r.data, goal: r.data.goal || user?.calories || 2000 })).catch(() => {})
     getRecipes().then(r => setRecipes(r.data)).catch(() => {})
   }, [])
 
