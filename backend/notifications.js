@@ -95,6 +95,38 @@ cron.schedule('0 12 * * *', async () => {
 }, { timezone: 'Europe/Moscow' })
 
 // ── 14:00 и 17:00 — Напоминание о воде ──────────────────
+// ── Проверка очереди уведомлений из базы ────────────────
+cron.schedule('*/5 * * * *', async () => {
+  try {
+    db.exec(`CREATE TABLE IF NOT EXISTS notifications_queue (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER, type TEXT, data TEXT,
+      sent INTEGER DEFAULT 0, created_at TEXT DEFAULT (datetime('now'))
+    )`)
+    const pending = db.prepare("SELECT * FROM notifications_queue WHERE sent = 0 LIMIT 10").all()
+    for (const notif of pending) {
+      try {
+        const user = db.prepare('SELECT * FROM users WHERE id = ?').get(notif.user_id)
+        if (!user) continue
+        const data = JSON.parse(notif.data || '{}')
+        let text = ''
+        if (notif.type === 'event_invite') {
+          const d = new Date(data.event_date).toLocaleDateString('ru', { day: 'numeric', month: 'long' })
+          text = `🎉 *${data.from_name}* приглашает тебя на мероприятие!
+
+📅 *${data.event_title}*
+🗓 ${d}, ${data.event_time}
+📍 ${data.event_location}`
+        }
+        if (text) {
+          await sendMessage(user.telegram_id, text, [[{ text: '📅 Открыть события', web_app: { url: MINI_APP_URL + '?tab=calendar' } }]])
+        }
+        db.prepare("UPDATE notifications_queue SET sent = 1 WHERE id = ?").run(notif.id)
+      } catch(e) { console.error('Notif error:', e.message) }
+    }
+  } catch(e) {}
+})
+
 const waterReminder = async () => {
   console.log('⏰ Water notification')
   const users = getAllUsers()
