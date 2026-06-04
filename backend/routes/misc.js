@@ -60,8 +60,29 @@ router.post('/subscriptions/:id/use', auth, (req, res) => {
   res.json(db.prepare('SELECT * FROM subscriptions WHERE id = ?').get(req.params.id))
 })
 
+// ── PUBLIC PLACES ─────────────────────────────────────────
+router.get('/places', (req, res) => {
+  try {
+    db.exec(`CREATE TABLE IF NOT EXISTS places (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL, type TEXT DEFAULT 'studio',
+      address TEXT, lat REAL, lng REAL,
+      description TEXT, phone TEXT, website TEXT,
+      emoji TEXT DEFAULT '📍', color TEXT DEFAULT '#E8437A',
+      rating REAL DEFAULT 0, tags TEXT DEFAULT '[]',
+      parent_id INTEGER DEFAULT NULL,
+      created_at TEXT DEFAULT (datetime('now'))
+    )`)
+  } catch(e) {}
+  const places = db.prepare('SELECT * FROM places ORDER BY name').all()
+  res.json(places.map(p => ({
+    ...p,
+    tags: JSON.parse(p.tags || '[]')
+  })))
+})
+
 // ── PUBLIC EVENTS ─────────────────────────────────────────
-router.get('/events/all', auth, (req, res) => {
+router.get('/events/all', (req, res) => {
   const events = db.prepare('SELECT * FROM events ORDER BY date ASC').all()
   res.json(events.map(e => ({
     id: e.id, title: e.title, type: e.type,
@@ -72,7 +93,7 @@ router.get('/events/all', auth, (req, res) => {
 })
 
 // ── RECIPES ───────────────────────────────────────────────────
-router.get('/recipes', auth, (req, res) => {
+router.get('/recipes', (req, res) => {
   const recipes = db.prepare('SELECT * FROM recipes').all()
   res.json(recipes.map(r => ({
     ...r,
