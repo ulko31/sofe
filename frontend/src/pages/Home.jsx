@@ -3,10 +3,11 @@ import { getTodayStats, getTrackers, getMeals, updateTracker, addMeal, deleteMea
 import { searchLocalFoods } from '../utils/commonFoods'
 import { useTelegram } from '../hooks/useTelegram'
 import FoodScan from './FoodScan'
+import Mascot from '../assets/mascot.svg?react'
 
 export default function Home({ user, onOpenAI, onTabChange }) {
   const { haptic } = useTelegram()
-  const [stats, setStats] = useState({ consumed: 0, goal: 2000, burned: 0, protein: 0, fat: 0, carbs: 0 })
+  const [stats, setStats] = useState({ consumed: 0, goal: user?.calories || 2000, burned: 0, protein: 0, fat: 0, carbs: 0 })
   const [trackers, setTrackers] = useState({ water: 0, steps: 0, sleep: 0, pulse: 0 })
   const [meals, setMeals] = useState([])
   const [loading, setLoading] = useState(true)
@@ -171,7 +172,7 @@ export default function Home({ user, onOpenAI, onTabChange }) {
   return (
     <div className="screen">
       {/* Greeting */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <h2 style={{ fontSize: 20, fontWeight: 900 }}>
             Привет, {user?.name?.split(' ')[0] || 'красотка'}! 👋
@@ -179,6 +180,9 @@ export default function Home({ user, onOpenAI, onTabChange }) {
           <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>
             {new Date().toLocaleDateString('ru', { weekday: 'long', day: 'numeric', month: 'long' })}
           </p>
+        </div>
+        <div style={{ width: 70, height: 70, flexShrink: 0 }} onClick={() => onOpenAI?.()}>
+          <img src="/mascot.svg" alt="SOFE" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
         </div>
         <div style={{ width: 42, height: 42, borderRadius: '50%', background: 'var(--pink-mid)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>🌸</div>
       </div>
@@ -216,7 +220,9 @@ export default function Home({ user, onOpenAI, onTabChange }) {
       <div>
         {/* AI Assistant quick access */}
         <div onClick={() => onOpenAI?.()} style={{ background: 'linear-gradient(135deg, var(--pink), #c2305e)', borderRadius: 'var(--radius)', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', marginBottom: 4 }}>
-          <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>🤖</div>
+          <div style={{ width: 44, height: 44, flexShrink: 0, overflow: 'hidden' }}>
+              <img src="/mascot.svg" alt="SOFE" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+            </div>
           <div style={{ flex: 1 }}>
             <div style={{ color: 'white', fontWeight: 800, fontSize: 14 }}>SOFE ИИ-ассистент</div>
             <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 2 }}>Спроси про питание или тренировки</div>
