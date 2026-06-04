@@ -1,0 +1,83 @@
+export const COMMON_FOODS = [
+  // Молочные
+  { id: 'l1', name: 'Молоко 2.5%', calories: 52, protein: 2.8, fat: 2.5, carbs: 4.7, unit: '100мл', unit_weight: 100 },
+  { id: 'l2', name: 'Кефир 1%', calories: 40, protein: 3.0, fat: 1.0, carbs: 4.0, unit: '100мл', unit_weight: 100 },
+  { id: 'l3', name: 'Творог 5%', calories: 121, protein: 17.2, fat: 5.0, carbs: 1.8, unit: '100г', unit_weight: 100 },
+  { id: 'l4', name: 'Творог 0%', calories: 71, protein: 16.5, fat: 0.1, carbs: 1.3, unit: '100г', unit_weight: 100 },
+  { id: 'l5', name: 'Йогурт греческий', calories: 97, protein: 9.0, fat: 5.0, carbs: 3.6, unit: '100г', unit_weight: 100 },
+  { id: 'l6', name: 'Сыр Российский', calories: 364, protein: 23.2, fat: 29.5, carbs: 0.3, unit: '100г', unit_weight: 100 },
+  { id: 'l7', name: 'Сметана 15%', calories: 158, protein: 2.6, fat: 15.0, carbs: 3.0, unit: '100г', unit_weight: 100 },
+  { id: 'l8', name: 'Масло сливочное', calories: 748, protein: 0.5, fat: 82.5, carbs: 0.8, unit: '1 ч.л.', unit_weight: 10 },
+  // Мясо и рыба
+  { id: 'm1', name: 'Куриная грудка', calories: 113, protein: 23.6, fat: 1.9, carbs: 0.4, unit: '100г', unit_weight: 100 },
+  { id: 'm2', name: 'Куриное бедро', calories: 185, protein: 18.6, fat: 11.9, carbs: 0.1, unit: '100г', unit_weight: 100 },
+  { id: 'm3', name: 'Котлета куриная', calories: 185, protein: 15.4, fat: 11.2, carbs: 5.0, unit: '1 шт', unit_weight: 80 },
+  { id: 'm4', name: 'Котлета говяжья', calories: 235, protein: 14.6, fat: 17.2, carbs: 5.6, unit: '1 шт', unit_weight: 80 },
+  { id: 'm5', name: 'Говядина', calories: 187, protein: 18.9, fat: 12.4, carbs: 0.0, unit: '100г', unit_weight: 100 },
+  { id: 'm6', name: 'Свинина', calories: 259, protein: 16.9, fat: 21.5, carbs: 0.0, unit: '100г', unit_weight: 100 },
+  { id: 'm7', name: 'Лосось', calories: 208, protein: 20.0, fat: 13.4, carbs: 0.0, unit: '100г', unit_weight: 100 },
+  { id: 'm8', name: 'Тунец консервированный', calories: 96, protein: 22.0, fat: 0.7, carbs: 0.0, unit: '100г', unit_weight: 100 },
+  { id: 'm9', name: 'Яйцо куриное', calories: 157, protein: 12.7, fat: 11.5, carbs: 0.7, unit: '1 шт', unit_weight: 60 },
+  { id: 'm10', name: 'Яйцо варёное', calories: 155, protein: 12.6, fat: 10.6, carbs: 0.6, unit: '1 шт', unit_weight: 60 },
+  // Злаки и гарниры
+  { id: 'g1', name: 'Рис варёный', calories: 130, protein: 2.7, fat: 0.3, carbs: 28.2, unit: '100г', unit_weight: 100 },
+  { id: 'g2', name: 'Гречка варёная', calories: 110, protein: 4.2, fat: 1.1, carbs: 21.3, unit: '100г', unit_weight: 100 },
+  { id: 'g3', name: 'Пюре картофельное', calories: 90, protein: 2.2, fat: 3.3, carbs: 14.0, unit: '100г', unit_weight: 100 },
+  { id: 'g4', name: 'Картофель варёный', calories: 77, protein: 2.0, fat: 0.1, carbs: 17.0, unit: '100г', unit_weight: 100 },
+  { id: 'g5', name: 'Картофель жареный', calories: 192, protein: 2.8, fat: 9.5, carbs: 23.0, unit: '100г', unit_weight: 100 },
+  { id: 'g6', name: 'Паста варёная', calories: 158, protein: 5.8, fat: 0.9, carbs: 30.9, unit: '100г', unit_weight: 100 },
+  { id: 'g7', name: 'Овсянка на воде', calories: 88, protein: 3.0, fat: 1.7, carbs: 15.0, unit: '100г', unit_weight: 100 },
+  { id: 'g8', name: 'Овсянка на молоке', calories: 102, protein: 3.9, fat: 3.3, carbs: 14.7, unit: '100г', unit_weight: 100 },
+  { id: 'g9', name: 'Хлеб белый', calories: 265, protein: 8.1, fat: 3.2, carbs: 49.0, unit: '1 ломтик', unit_weight: 30 },
+  { id: 'g10', name: 'Хлеб ржаной', calories: 259, protein: 8.5, fat: 3.3, carbs: 45.8, unit: '1 ломтик', unit_weight: 35 },
+  { id: 'g11', name: 'Макароны варёные', calories: 112, protein: 3.9, fat: 0.6, carbs: 22.9, unit: '100г', unit_weight: 100 },
+  // Первые блюда
+  { id: 's1', name: 'Борщ', calories: 57, protein: 2.8, fat: 2.1, carbs: 7.3, unit: '100г', unit_weight: 100 },
+  { id: 's2', name: 'Щи', calories: 28, protein: 1.5, fat: 1.2, carbs: 3.3, unit: '100г', unit_weight: 100 },
+  { id: 's3', name: 'Куриный суп', calories: 36, protein: 3.1, fat: 1.3, carbs: 3.2, unit: '100г', unit_weight: 100 },
+  { id: 's4', name: 'Гречневый суп', calories: 45, protein: 2.2, fat: 1.4, carbs: 6.8, unit: '100г', unit_weight: 100 },
+  { id: 's5', name: 'Рассольник', calories: 42, protein: 2.1, fat: 1.8, carbs: 5.0, unit: '100г', unit_weight: 100 },
+  // Овощи
+  { id: 'v1', name: 'Помидор', calories: 18, protein: 0.9, fat: 0.2, carbs: 3.7, unit: '100г', unit_weight: 100 },
+  { id: 'v2', name: 'Огурец', calories: 15, protein: 0.8, fat: 0.1, carbs: 2.5, unit: '100г', unit_weight: 100 },
+  { id: 'v3', name: 'Капуста', calories: 27, protein: 1.8, fat: 0.1, carbs: 4.7, unit: '100г', unit_weight: 100 },
+  { id: 'v4', name: 'Морковь', calories: 41, protein: 0.9, fat: 0.2, carbs: 9.6, unit: '100г', unit_weight: 100 },
+  { id: 'v5', name: 'Брокколи', calories: 34, protein: 2.8, fat: 0.4, carbs: 6.6, unit: '100г', unit_weight: 100 },
+  { id: 'v6', name: 'Свёкла', calories: 43, protein: 1.5, fat: 0.1, carbs: 9.6, unit: '100г', unit_weight: 100 },
+  { id: 'v7', name: 'Перец болгарский', calories: 27, protein: 0.9, fat: 0.3, carbs: 5.4, unit: '100г', unit_weight: 100 },
+  { id: 'v8', name: 'Авокадо', calories: 160, protein: 2.0, fat: 14.7, carbs: 8.5, unit: '100г', unit_weight: 100 },
+  // Фрукты
+  { id: 'f1', name: 'Банан', calories: 89, protein: 1.1, fat: 0.3, carbs: 22.8, unit: '1 шт', unit_weight: 120 },
+  { id: 'f2', name: 'Яблоко', calories: 52, protein: 0.3, fat: 0.4, carbs: 13.8, unit: '1 шт', unit_weight: 180 },
+  { id: 'f3', name: 'Апельсин', calories: 43, protein: 0.9, fat: 0.2, carbs: 8.1, unit: '1 шт', unit_weight: 150 },
+  { id: 'f4', name: 'Виноград', calories: 69, protein: 0.6, fat: 0.2, carbs: 17.2, unit: '100г', unit_weight: 100 },
+  { id: 'f5', name: 'Клубника', calories: 33, protein: 0.8, fat: 0.4, carbs: 7.5, unit: '100г', unit_weight: 100 },
+  // Готовые блюда
+  { id: 'r1', name: 'Пельмени', calories: 275, protein: 11.8, fat: 14.0, carbs: 26.0, unit: '100г', unit_weight: 100 },
+  { id: 'r2', name: 'Вареники с картофелем', calories: 190, protein: 5.8, fat: 4.2, carbs: 32.5, unit: '100г', unit_weight: 100 },
+  { id: 'r3', name: 'Омлет', calories: 184, protein: 10.0, fat: 14.0, carbs: 3.0, unit: '100г', unit_weight: 100 },
+  { id: 'r4', name: 'Яичница', calories: 192, protein: 13.6, fat: 15.3, carbs: 0.9, unit: '100г', unit_weight: 100 },
+  { id: 'r5', name: 'Блин', calories: 233, protein: 6.1, fat: 12.3, carbs: 26.0, unit: '1 шт', unit_weight: 60 },
+  { id: 'r6', name: 'Сырник', calories: 220, protein: 10.2, fat: 8.9, carbs: 26.4, unit: '1 шт', unit_weight: 60 },
+  { id: 'r7', name: 'Греческий салат', calories: 100, protein: 3.5, fat: 7.0, carbs: 6.0, unit: '100г', unit_weight: 100 },
+  { id: 'r8', name: 'Оливье', calories: 198, protein: 5.2, fat: 15.9, carbs: 10.8, unit: '100г', unit_weight: 100 },
+  { id: 'r9', name: 'Плов', calories: 245, protein: 9.8, fat: 11.0, carbs: 26.7, unit: '100г', unit_weight: 100 },
+  { id: 'r10', name: 'Тушёная капуста', calories: 75, protein: 2.3, fat: 3.8, carbs: 8.0, unit: '100г', unit_weight: 100 },
+  { id: 'r11', name: 'Запечённая курица', calories: 197, protein: 25.9, fat: 10.4, carbs: 0.4, unit: '100г', unit_weight: 100 },
+  { id: 'r12', name: 'Рыба жареная', calories: 166, protein: 17.6, fat: 9.5, carbs: 3.8, unit: '100г', unit_weight: 100 },
+  // Напитки и снэки
+  { id: 'n1', name: 'Кофе чёрный', calories: 2, protein: 0.2, fat: 0.0, carbs: 0.3, unit: '1 чашка', unit_weight: 200 },
+  { id: 'n2', name: 'Кофе латте', calories: 120, protein: 6.0, fat: 5.0, carbs: 10.0, unit: '1 чашка', unit_weight: 300 },
+  { id: 'n3', name: 'Чай без сахара', calories: 1, protein: 0.0, fat: 0.0, carbs: 0.3, unit: '1 чашка', unit_weight: 200 },
+  { id: 'n4', name: 'Протеин сывороточный', calories: 370, protein: 75.0, fat: 5.0, carbs: 10.0, unit: '1 порция', unit_weight: 30 },
+  { id: 'n5', name: 'Миндаль', calories: 579, protein: 21.2, fat: 49.9, carbs: 21.6, unit: '100г', unit_weight: 100 },
+  { id: 'n6', name: 'Арахисовая паста', calories: 588, protein: 25.1, fat: 50.4, carbs: 19.6, unit: '1 ст.л.', unit_weight: 16 },
+  { id: 'n7', name: 'Шоколад тёмный', calories: 598, protein: 7.8, fat: 42.6, carbs: 45.9, unit: '100г', unit_weight: 100 },
+  { id: 'n8', name: 'Мёд', calories: 304, protein: 0.8, fat: 0.0, carbs: 82.4, unit: '1 ч.л.', unit_weight: 7 },
+]
+
+export function searchLocalFoods(query) {
+  if (!query || query.length < 1) return []
+  const q = query.toLowerCase()
+  return COMMON_FOODS.filter(f => f.name.toLowerCase().includes(q)).slice(0, 12)
+}
