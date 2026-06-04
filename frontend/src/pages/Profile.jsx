@@ -133,6 +133,21 @@ export default function Profile({ user, tgUser, onTabChange, onOpenAI }) {
                 <input type="number" value={form.calories} onChange={e => setForm(f => ({ ...f, calories: parseInt(e.target.value) || 2000 }))} />
               </div>
 
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Вес (кг)</label>
+                  <input type="number" value={form.weight || ''} onChange={e => setForm(f => ({ ...f, weight: e.target.value }))} placeholder="60" />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Рост (см)</label>
+                  <input type="number" value={form.height || ''} onChange={e => setForm(f => ({ ...f, height: e.target.value }))} placeholder="165" />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Возраст</label>
+                  <input type="number" value={form.age || ''} onChange={e => setForm(f => ({ ...f, age: e.target.value }))} placeholder="25" />
+                </div>
+              </div>
+
               <div>
                 <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: 8 }}>Цель</label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
