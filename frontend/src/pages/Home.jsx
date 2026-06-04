@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { getTodayStats, getTrackers, getMeals, updateTracker, addMeal, deleteMeal, searchFoods } from '../utils/api'
+import { searchLocalFoods } from '../utils/commonFoods'
 import { useTelegram } from '../hooks/useTelegram'
 import FoodScan from './FoodScan'
 
@@ -12,6 +13,7 @@ export default function Home({ user }) {
   const [showAddMeal, setShowAddMeal] = useState(false)
   const [addMealType, setAddMealType] = useState('snack')
   const [showScan, setShowScan] = useState(false)
+  const [scanMode, setScanMode] = useState(null)
 
   // Food search state
   const [query, setQuery] = useState('')
@@ -41,14 +43,26 @@ export default function Home({ user }) {
       return
     }
     clearTimeout(searchTimeout.current)
+    // Show local results immediately
+    const localResults = searchLocalFoods(query)
+    setSearchResults(localResults)
     setSearching(true)
+    // Then supplement with backend results
     searchTimeout.current = setTimeout(async () => {
       try {
         const res = await searchFoods(query)
-        setSearchResults(res.data)
-      } catch (e) {}
-      finally { setSearching(false) }
-    }, 300)
+        if (res.data?.length > 0) {
+          // Merge: backend results first, then local ones not already in backend
+          const backendNames = new Set(res.data.map(f => f.name.toLowerCase()))
+          const uniqueLocal = localResults.filter(f => !backendNames.has(f.name.toLowerCase()))
+          setSearchResults([...res.data, ...uniqueLocal])
+        }
+      } catch (e) {
+        // Keep local results on error
+      } finally {
+        setSearching(false)
+      }
+    }, 500)
   }, [query])
 
   const handleSelectFood = (food) => {
@@ -139,7 +153,8 @@ export default function Home({ user }) {
 
   if (showScan) return (
     <FoodScan
-      onBack={() => setShowScan(false)}
+      initialMode={scanMode}
+      onBack={() => { setShowScan(false); setScanMode(null) }}
       onMealAdded={(meal) => {
         setMeals(m => [...m, meal])
         setStats(s => ({ ...s, consumed: s.consumed + (meal.calories || 0) }))
@@ -232,8 +247,11 @@ export default function Home({ user }) {
         <div className="section-header">
           <h3>Питание</h3>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={() => { haptic('light'); setShowScan(true) }} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--green-light)', border: 'none', color: 'var(--green-dark)', borderRadius: 8, padding: '5px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Nunito, sans-serif' }}>
-              <i className="ti ti-scan" style={{ fontSize: 14 }} /> Сканер
+            <button onClick={() => { haptic('light'); setShowScan(true); setScanMode('photo') }} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--pink-light)', border: 'none', color: 'var(--pink)', borderRadius: 8, padding: '5px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Nunito, sans-serif' }}>
+              <i className="ti ti-camera" style={{ fontSize: 14 }} /> Фото
+            </button>
+            <button onClick={() => { haptic('light'); setShowScan(true); setScanMode('barcode') }} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--green-light)', border: 'none', color: 'var(--green-dark)', borderRadius: 8, padding: '5px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Nunito, sans-serif' }}>
+              <i className="ti ti-scan" style={{ fontSize: 14 }} /> Штрихкод
             </button>
             <a onClick={() => { haptic('light'); setShowAddMeal(true) }}>+ Добавить</a>
           </div>
