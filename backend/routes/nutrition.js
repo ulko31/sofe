@@ -1,54 +1,70 @@
+require('dotenv').config()
 const express = require('express')
 const router = express.Router()
-const db = require('../db/init')
 const auth = require('../middleware/auth')
 
-// GET /api/nutrition/today — summary stats
-router.get('/today', auth, (req, res) => {
+let db, turso
+try {
+  if (process.env.TURSO_URL) turso = require('../db/turso')
+  else db = require('../db/init')
+} catch(e) { db = require('../db/init') }
+
+async function q(sql, args = []) {
+  if (turso) return turso.query(sql, args)
+  return db.prepare(sql).all(...args)
+}
+async function qOne(sql, args = []) {
+  if (turso) return turso.queryOne(sql, args)
+  return db.prepare(sql).get(...args)
+}
+async function r(sql, args = []) {
+  if (turso) return turso.run(sql, args)
+  return db.prepare(sql).run(...args)
+}
+
+// GET /api/nutrition/today
+router.get('/today', auth, async (req, res) => {
   const today = new Date().toISOString().split('T')[0]
-  const user = req.user
-
-  const meals = db.prepare('SELECT * FROM meals WHERE user_id = ? AND date = ?').all(user.id, today)
-
-  const consumed = meals.reduce((s, m) => s + (m.calories || 0), 0)
-  const protein = meals.reduce((s, m) => s + (m.protein || 0), 0)
-  const fat = meals.reduce((s, m) => s + (m.fat || 0), 0)
-  const carbs = meals.reduce((s, m) => s + (m.carbs || 0), 0)
-
-  res.json({
-    consumed: Math.round(consumed),
-    goal: user.calories || 2000,
-    burned: 0,
-    protein: Math.round(protein),
-    fat: Math.round(fat),
-    carbs: Math.round(carbs)
-  })
+  try {
+    const user = await qOne('SELECT * FROM users WHERE id = ?', [req.user.id])
+    const meals = await q('SELECT * FROM meals WHERE user_id = ? AND date = ?', [req.user.id, today])
+    const consumed = meals.reduce((s, m) => s + (m.calories || 0), 0)
+    const protein = meals.reduce((s, m) => s + (m.protein || 0), 0)
+    const fat = meals.reduce((s, m) => s + (m.fat || 0), 0)
+    const carbs = meals.reduce((s, m) => s + (m.carbs || 0), 0)
+    res.json({ consumed, goal: user?.calories || 2000, protein, fat, carbs })
+  } catch(e) { res.status(500).json({ error: e.message }) }
 })
 
-// GET /api/nutrition/meals?date=YYYY-MM-DD
-router.get('/meals', auth, (req, res) => {
+// GET /api/nutrition/meals
+router.get('/meals', auth, async (req, res) => {
   const date = req.query.date || new Date().toISOString().split('T')[0]
-  const meals = db.prepare('SELECT * FROM meals WHERE user_id = ? AND date = ? ORDER BY created_at ASC').all(req.user.id, date)
-  res.json(meals)
+  try {
+    const meals = await q('SELECT * FROM meals WHERE user_id = ? AND date = ? ORDER BY created_at', [req.user.id, date])
+    res.json(meals)
+  } catch(e) { res.status(500).json({ error: e.message }) }
 })
 
 // POST /api/nutrition/meals
-router.post('/meals', auth, (req, res) => {
+router.post('/meals', auth, async (req, res) => {
   const { name, calories, protein, fat, carbs, type, date } = req.body
-  if (!name) return res.status(400).json({ error: 'Name required' })
-
-  const result = db.prepare(
-    'INSERT INTO meals (user_id, name, calories, protein, fat, carbs, type, date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-  ).run(req.user.id, name, calories || 0, protein || 0, fat || 0, carbs || 0, type || 'snack', date || new Date().toISOString().split('T')[0])
-
-  const meal = db.prepare('SELECT * FROM meals WHERE id = ?').get(result.lastInsertRowid)
-  res.json(meal)
+  if (!name) return res.status(400).json({ error: 'name required' })
+  try {
+    const result = await r(
+      'INSERT INTO meals (user_id, name, calories, protein, fat, carbs, type, date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [req.user.id, name, calories || 0, protein || 0, fat || 0, carbs || 0, type || 'snack', date || new Date().toISOString().split('T')[0]]
+    )
+    const meal = await qOne('SELECT * FROM meals WHERE id = ?', [result.lastInsertRowid])
+    res.json(meal)
+  } catch(e) { res.status(500).json({ error: e.message }) }
 })
 
 // DELETE /api/nutrition/meals/:id
-router.delete('/meals/:id', auth, (req, res) => {
-  db.prepare('DELETE FROM meals WHERE id = ? AND user_id = ?').run(req.params.id, req.user.id)
-  res.json({ ok: true })
+router.delete('/meals/:id', auth, async (req, res) => {
+  try {
+    await r('DELETE FROM meals WHERE id = ? AND user_id = ?', [req.params.id, req.user.id])
+    res.json({ ok: true })
+  } catch(e) { res.status(500).json({ error: e.message }) }
 })
 
 module.exports = router
