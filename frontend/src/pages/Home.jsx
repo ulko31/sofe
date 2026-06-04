@@ -3,7 +3,6 @@ import { getTodayStats, getTrackers, getMeals, updateTracker, addMeal, deleteMea
 import { searchLocalFoods } from '../utils/commonFoods'
 import { useTelegram } from '../hooks/useTelegram'
 import FoodScan from './FoodScan'
-import Mascot from '../assets/mascot.svg?react'
 
 export default function Home({ user, onOpenAI, onTabChange }) {
   const { haptic } = useTelegram()
