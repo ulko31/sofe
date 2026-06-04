@@ -507,18 +507,25 @@ function RecipesPreview() {
   }, [])
 
   if (recipes.length === 0) return (
-    <div style={{ background: 'var(--white)', borderRadius: 'var(--radius)', padding: '14px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13, border: '0.5px solid var(--border)' }}>
-      Рецепты появятся здесь 🍽
+    <div style={{ background: 'var(--white)', borderRadius: 'var(--radius)', padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13, border: '0.5px solid var(--border)' }}>
+      🍽 Рецепты загружаются...
     </div>
   )
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
       {recipes.map(r => (
-        <div key={r.id} className="card" style={{ cursor: 'pointer', padding: 14 }} onClick={() => haptic('light')}>
-          <div style={{ fontSize: 28, marginBottom: 6 }}>{r.emoji || '🍽'}</div>
-          <div style={{ fontSize: 13, fontWeight: 800, lineHeight: 1.3 }}>{r.name}</div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>{r.calories} ккал · {r.time} мин</div>
+        <div key={r.id} onClick={() => { haptic('light'); onTabChange?.('nutrition') }}
+          style={{ background: 'var(--white)', borderRadius: 'var(--radius)', overflow: 'hidden', cursor: 'pointer', border: '0.5px solid var(--border)', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+          {r.image_url ? (
+            <img src={r.image_url} alt={r.name} style={{ width: '100%', height: 90, objectFit: 'cover' }} onError={e => { e.target.style.display='none' }} />
+          ) : (
+            <div style={{ width: '100%', height: 90, background: 'var(--pink-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36 }}>{r.emoji || '🍽'}</div>
+          )}
+          <div style={{ padding: '10px 12px' }}>
+            <div style={{ fontSize: 12, fontWeight: 800, lineHeight: 1.3 }}>{r.name}</div>
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 3 }}>{r.calories} ккал · {r.time} мин</div>
+          </div>
         </div>
       ))}
     </div>
