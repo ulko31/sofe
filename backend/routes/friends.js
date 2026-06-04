@@ -53,8 +53,23 @@ router.post('/invite', auth, (req, res) => {
   })
 })
 
-// POST /api/friends/accept-invite — accept via invite token
-router.post('/accept-invite', auth, (req, res) => {
+// POST /api/friends/accept-invite — accept via invite token (works with or without auth)
+router.post('/accept-invite', (req, res) => {
+  // Try to get user from auth header, or from telegram_id in body
+  const authHeader = req.headers['x-telegram-init-data']
+  let currentUser = null
+  if (authHeader) {
+    try {
+      const params = new URLSearchParams(authHeader)
+      const userStr = params.get('user')
+      if (userStr) {
+        const tgUser = JSON.parse(decodeURIComponent(userStr))
+        currentUser = db.prepare('SELECT * FROM users WHERE telegram_id = ?').get(String(tgUser.id))
+      }
+    } catch(e) {}
+  }
+  const req_user = currentUser
+  if (!req_user) return res.status(401).json({ error: 'Not authenticated' })
   const { token } = req.body
   if (!token) return res.status(400).json({ error: 'Token required' })
 
@@ -63,18 +78,17 @@ router.post('/accept-invite', auth, (req, res) => {
     const [inviterId] = decoded.split(':')
     const inviterIdInt = parseInt(inviterId)
 
-    if (inviterIdInt === req.user.id) {
+    if (inviterIdInt === req_user.id) {
       return res.status(400).json({ error: 'Cannot add yourself' })
     }
 
     const inviter = db.prepare('SELECT * FROM users WHERE id = ?').get(inviterIdInt)
     if (!inviter) return res.status(404).json({ error: 'User not found' })
 
-    // Check if already friends
     const existing = db.prepare(`
       SELECT * FROM friendships
       WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)
-    `).get(req.user.id, inviterIdInt, inviterIdInt, req.user.id)
+    `).get(req_user.id, inviterIdInt, inviterIdInt, req_user.id)
 
     if (existing?.status === 'accepted') {
       return res.json({ already_friends: true, friend: inviter })
@@ -84,12 +98,13 @@ router.post('/accept-invite', auth, (req, res) => {
       db.prepare("UPDATE friendships SET status = 'accepted' WHERE id = ?").run(existing.id)
     } else {
       db.prepare("INSERT INTO friendships (user_id, friend_id, status) VALUES (?, ?, 'accepted')")
-        .run(inviterIdInt, req.user.id)
+        .run(inviterIdInt, req_user.id)
     }
 
     res.json({ success: true, friend: { id: inviter.id, name: inviter.name, username: inviter.username } })
   } catch(e) {
-    res.status(400).json({ error: 'Invalid token' })
+    console.error('accept-invite error:', e)
+    res.status(400).json({ error: 'Invalid token: ' + e.message })
   }
 })
 
