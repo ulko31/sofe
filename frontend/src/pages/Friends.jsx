@@ -107,12 +107,11 @@ export default function Friends({ user, onBack }) {
 
   const handleAddByContact = () => {
     haptic('light')
-    // Open Telegram contact picker
-    if (window.Telegram?.WebApp?.requestContact) {
-      window.Telegram.WebApp.requestContact?.()
-    } else {
-      alert('Открой SOFE в Telegram чтобы добавить из контактов')
-    }
+    // Share invite link instead - Telegram doesn't support contact picker in Mini Apps
+    handleGetInviteLink().then(() => {
+      setTab('add')
+    })
+    alert('Создай ссылку-приглашение и отправь её подруге в Telegram!')
   }
 
   const handleAccept = async (friendshipId) => {
