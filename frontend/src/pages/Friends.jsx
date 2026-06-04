@@ -316,16 +316,7 @@ export default function Friends({ user, onBack }) {
               )}
             </div>
 
-            {/* Add from contacts */}
-            <div className="card">
-              <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 6 }}>👥 Из контактов Telegram</div>
-              <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 14 }}>
-                Выбери контакт из Telegram — если она уже в SOFE, запрос отправится автоматически
-              </div>
-              <button className="btn-outline" onClick={handleAddByContact}>
-                Открыть контакты
-              </button>
-            </div>
+
 
             {/* Location sharing */}
             <div className="card" style={{ background: shareLocation ? 'var(--green-light)' : 'var(--white)', border: shareLocation ? '1.5px solid var(--green)' : '0.5px solid var(--border)' }}>
