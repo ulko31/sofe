@@ -5,16 +5,15 @@ import { useTelegram } from '../hooks/useTelegram'
 const filters = ['Все', 'FIT', 'Stretching', 'Fit ball', 'Йога', 'Пилатес']
 const workoutEmoji = { FIT: '🏃‍♀️', Stretching: '🧘‍♀️', 'Fit ball': '⚽', Йога: '🪷', Пилатес: '🎯' }
 
-function getGoogleDriveEmbedUrl(url) {
+function getVideoEmbedUrl(url) {
   if (!url) return null
-  // Convert Google Drive share link to embed link
-  const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/)
-  if (match) return `https://drive.google.com/file/d/${match[1]}/preview`
-  // If already embed link
-  if (url.includes('drive.google.com/file/d/')) return url.replace('/view', '/preview')
   // YouTube
-  const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/)
-  if (ytMatch) return `https://www.youtube.com/embed/${ytMatch[1]}`
+  const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]+)/)
+  if (ytMatch) return `https://www.youtube.com/embed/${ytMatch[1]}?rel=0&showinfo=0`
+  // Google Drive
+  const driveMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/)
+  if (driveMatch) return `https://drive.google.com/file/d/${driveMatch[1]}/preview`
+  if (url.includes('drive.google.com')) return url.replace('/view', '/preview').replace('?usp=sharing', '')
   return url
 }
 
@@ -155,7 +154,7 @@ export default function Workouts() {
 
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 0 32px' }}>
             <iframe
-              src={getGoogleDriveEmbedUrl(selectedWorkout.video_url)}
+              src={getVideoEmbedUrl(selectedWorkout.video_url)}
               style={{ width: '100%', height: 'min(56vw, 400px)', border: 'none', borderRadius: 12 }}
               allow="autoplay; fullscreen"
               allowFullScreen
