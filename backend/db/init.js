@@ -26,7 +26,7 @@ if (!TURSO_URL || !TURSO_TOKEN) {
   // Init schema then export
   initTurso(tursoClient).then(() => {
     console.log('✅ Turso ready')
-  seedRecipes(client).catch(console.error)
+    seedRecipes(tursoClient).catch(console.error)
   }).catch(e => console.error('Turso init error:', e))
   
   module.exports = db
