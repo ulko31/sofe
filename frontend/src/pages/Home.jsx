@@ -180,14 +180,13 @@ export default function Home({ user, onOpenAI, onTabChange }) {
             {new Date().toLocaleDateString('ru', { weekday: 'long', day: 'numeric', month: 'long' })}
           </p>
         </div>
-        <div style={{ width: 70, height: 70, flexShrink: 0 }} onClick={() => onOpenAI?.()}>
+        <div style={{ width: 64, height: 64, flexShrink: 0, cursor: 'pointer' }} onClick={() => onOpenAI?.()}>
           <img src="/mascot.svg" alt="SOFE" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
         </div>
-        <div style={{ width: 42, height: 42, borderRadius: '50%', background: 'var(--pink-mid)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>🌸</div>
       </div>
 
       {/* Calories card */}
-      <div style={{ background: 'var(--pink)', borderRadius: 'var(--radius)', padding: 18, color: 'white', position: 'relative', overflow: 'hidden' }}>
+      <div style={{ background: 'linear-gradient(135deg, #f06aa8 0%, #e84389 100%)', borderRadius: 'var(--radius)', padding: 18, color: 'white', position: 'relative', overflow: 'hidden' }}>
         <div style={{ position: 'absolute', right: -20, top: -20, width: 100, height: 100, borderRadius: '50%', background: 'rgba(255,255,255,0.1)' }} />
         <div style={{ position: 'absolute', right: 20, bottom: -30, width: 80, height: 80, borderRadius: '50%', background: 'rgba(255,255,255,0.08)' }} />
         <div style={{ display: 'flex', justifyContent: 'space-between', position: 'relative', zIndex: 1 }}>
@@ -218,7 +217,7 @@ export default function Home({ user, onOpenAI, onTabChange }) {
       {/* Trackers */}
       <div>
         {/* AI Assistant quick access */}
-        <div onClick={() => onOpenAI?.()} style={{ background: 'linear-gradient(135deg, var(--pink), #c2305e)', borderRadius: 'var(--radius)', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', marginBottom: 4 }}>
+        <div onClick={() => onOpenAI?.()} style={{ background: 'linear-gradient(135deg, #f472b6 0%, #ec4899 100%)', borderRadius: 'var(--radius)', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', marginBottom: 4 }}>
           <div style={{ width: 44, height: 44, flexShrink: 0, overflow: 'hidden' }}>
               <img src="/mascot.svg" alt="SOFE" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
             </div>
