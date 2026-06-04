@@ -1,628 +1,246 @@
-const Database = require('better-sqlite3')
-const path = require('path')
+require('dotenv').config()
 
-const db = new Database(path.join(__dirname, '../sofe.db'))
+// Use Turso (libsql) if configured, otherwise fall back to local SQLite
+const TURSO_URL = process.env.TURSO_URL
+const TURSO_TOKEN = process.env.TURSO_TOKEN
 
-db.pragma('journal_mode = WAL')
-db.pragma('foreign_keys = ON')
-
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    telegram_id TEXT UNIQUE NOT NULL,
-    name TEXT, username TEXT,
-    goal TEXT DEFAULT 'health',
-    age INTEGER,
-    weight REAL,
-    height REAL,
-    gender TEXT DEFAULT 'female',
-    calories INTEGER DEFAULT 2000,
-    activity TEXT DEFAULT 'medium',
-    onboarded INTEGER DEFAULT 0,
-    created_at TEXT DEFAULT (datetime('now'))
-  );
-  CREATE TABLE IF NOT EXISTS meals (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    name TEXT NOT NULL,
-    calories INTEGER DEFAULT 0,
-    protein REAL DEFAULT 0,
-    fat REAL DEFAULT 0,
-    carbs REAL DEFAULT 0,
-    type TEXT DEFAULT 'snack',
-    date TEXT NOT NULL,
-    created_at TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY (user_id) REFERENCES users(id)
-  );
-  CREATE TABLE IF NOT EXISTS trackers (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    date TEXT NOT NULL,
-    water REAL DEFAULT 0,
-    steps INTEGER DEFAULT 0,
-    sleep REAL DEFAULT 0,
-    pulse INTEGER DEFAULT 72,
-    updated_at TEXT DEFAULT (datetime('now')),
-    UNIQUE(user_id, date),
-    FOREIGN KEY (user_id) REFERENCES users(id)
-  );
-  CREATE TABLE IF NOT EXISTS workouts (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL, type TEXT NOT NULL,
-    duration INTEGER DEFAULT 30,
-    level TEXT DEFAULT 'Средний',
-    format TEXT DEFAULT 'Онлайн',
-    description TEXT,
-    video_url TEXT,
-    thumbnail_url TEXT,
-    instructor TEXT
-  );
-  CREATE TABLE IF NOT EXISTS user_workouts (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL, workout_id INTEGER NOT NULL,
-    date TEXT NOT NULL, completed INTEGER DEFAULT 0,
-    created_at TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY (user_id) REFERENCES users(id),
-    FOREIGN KEY (workout_id) REFERENCES workouts(id)
-  );
-  CREATE TABLE IF NOT EXISTS subscriptions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL, studio TEXT NOT NULL,
-    total INTEGER NOT NULL, used INTEGER DEFAULT 0,
-    expires_at TEXT, created_at TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY (user_id) REFERENCES users(id)
-  );
-  CREATE TABLE IF NOT EXISTS recipes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    calories INTEGER DEFAULT 0,
-    protein REAL DEFAULT 0,
-    fat REAL DEFAULT 0,
-    carbs REAL DEFAULT 0,
-    time INTEGER DEFAULT 15,
-    emoji TEXT DEFAULT '🍽',
-    tags TEXT DEFAULT '[]',
-    image_url TEXT,
-    ingredients TEXT DEFAULT '[]',
-    steps TEXT DEFAULT '[]',
-    servings INTEGER DEFAULT 2
-  );
-  CREATE TABLE IF NOT EXISTS events (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL,
-    type TEXT DEFAULT 'workout',
-    date TEXT NOT NULL,
-    time TEXT DEFAULT '10:00',
-    end_time TEXT DEFAULT '11:00',
-    emoji TEXT DEFAULT '🌸',
-    location TEXT DEFAULT '',
-    description TEXT DEFAULT '',
-    link TEXT DEFAULT '',
-    color TEXT DEFAULT '#E8437A',
-    created_at TEXT DEFAULT (datetime('now'))
-  );
-
-  CREATE TABLE IF NOT EXISTS friendships (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    friend_id INTEGER NOT NULL,
-    status TEXT DEFAULT 'pending',
-    created_at TEXT DEFAULT (datetime('now')),
-    UNIQUE(user_id, friend_id),
-    FOREIGN KEY (user_id) REFERENCES users(id),
-    FOREIGN KEY (friend_id) REFERENCES users(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS user_locations (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL UNIQUE,
-    lat REAL,
-    lng REAL,
-    share_location INTEGER DEFAULT 0,
-    updated_at TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY (user_id) REFERENCES users(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS foods (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    calories INTEGER NOT NULL,
-    protein REAL DEFAULT 0,
-    fat REAL DEFAULT 0,
-    carbs REAL DEFAULT 0,
-    unit TEXT DEFAULT '100г',
-    unit_weight INTEGER DEFAULT 100
-  );
-`)
-
-// Seed workouts
-const wCount = db.prepare('SELECT COUNT(*) as cnt FROM workouts').get()
-if (wCount.cnt === 0) {
-  const ins = db.prepare('INSERT INTO workouts (name, type, duration, level, format) VALUES (?, ?, ?, ?, ?)')
-  ;[
-    ['FIT-тренировка','FIT',45,'Интенсивный','Онлайн'],
-    ['Stretching','Stretching',30,'Лёгкий','Онлайн'],
-    ['Fit ball','Fit ball',40,'Средний','Студия'],
-    ['Йога для начинающих','Йога',50,'Лёгкий','Онлайн'],
-    ['Пилатес','Пилатес',45,'Средний','Студия'],
-    ['Силовая тренировка','FIT',60,'Высокий','Студия']
-  ].forEach(w => ins.run(...w))
+if (!TURSO_URL || !TURSO_TOKEN) {
+  console.log('⚠️  No Turso config — using local SQLite (data will reset on restart)')
+  const Database = require('better-sqlite3')
+  const path = require('path')
+  const fs = require('fs')
+  const dbPath = process.env.DB_PATH || path.join(__dirname, '../../data/sofe.db')
+  fs.mkdirSync(path.dirname(dbPath), { recursive: true })
+  const db = new Database(dbPath)
+  db.pragma('journal_mode = WAL')
+  initSqlite(db)
+  module.exports = db
+} else {
+  console.log('🗄️  Using Turso cloud database')
+  const { createClient } = require('@libsql/client')
+  const tursoClient = createClient({ url: TURSO_URL, authToken: TURSO_TOKEN })
+  
+  // Create async-aware proxy that queues operations
+  const db = createTursoProxy(tursoClient)
+  
+  // Init schema then export
+  initTurso(tursoClient).then(() => {
+    console.log('✅ Turso ready')
+  }).catch(e => console.error('Turso init error:', e))
+  
+  module.exports = db
 }
 
-// Seed foods
-function _seedFoods(db) {
-  const count = db.prepare('SELECT COUNT(*) as cnt FROM foods').get()
-  if (count.cnt > 0) return
-
-  const insert = db.prepare(`
-    INSERT INTO foods (name, calories, protein, fat, carbs, unit, unit_weight)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `)
-
-  const foods = [
-    // Молочные продукты
-    ['Молоко 2.5%', 52, 2.8, 2.5, 4.7, '100мл', 100],
-    ['Молоко 3.2%', 58, 2.9, 3.2, 4.7, '100мл', 100],
-    ['Кефир 1%', 40, 3.0, 1.0, 4.0, '100мл', 100],
-    ['Кефир 2.5%', 53, 2.9, 2.5, 4.0, '100мл', 100],
-    ['Йогурт натуральный', 68, 5.0, 3.2, 3.5, '100г', 100],
-    ['Йогурт греческий', 97, 9.0, 5.0, 3.6, '100г', 100],
-    ['Творог 0%', 71, 16.5, 0.1, 1.3, '100г', 100],
-    ['Творог 5%', 121, 17.2, 5.0, 1.8, '100г', 100],
-    ['Творог 9%', 159, 16.7, 9.0, 2.0, '100г', 100],
-    ['Сыр Российский', 364, 23.2, 29.5, 0.3, '100г', 100],
-    ['Сыр Моцарелла', 280, 22.0, 22.0, 0.6, '100г', 100],
-    ['Сыр Фета', 264, 14.2, 21.3, 4.1, '100г', 100],
-    ['Сыр Пармезан', 392, 35.8, 25.8, 3.2, '100г', 100],
-    ['Сыр Чеддер', 402, 23.0, 33.8, 1.3, '100г', 100],
-    ['Сметана 15%', 158, 2.6, 15.0, 3.0, '100г', 100],
-    ['Сметана 20%', 206, 2.5, 20.0, 3.2, '100г', 100],
-    ['Масло сливочное', 748, 0.5, 82.5, 0.8, '100г', 100],
-    ['Яйцо куриное', 157, 12.7, 11.5, 0.7, '1 шт', 60],
-    ['Яйцо белок', 44, 11.1, 0.1, 0.7, '100г', 100],
-    ['Яйцо желток', 352, 16.2, 31.9, 1.0, '100г', 100],
-
-    // Мясо
-    ['Куриная грудка', 113, 23.6, 1.9, 0.4, '100г', 100],
-    ['Куриное филе', 110, 23.1, 1.2, 0.0, '100г', 100],
-    ['Куриное бедро', 185, 21.3, 11.0, 0.1, '100г', 100],
-    ['Курица целая', 165, 18.2, 9.7, 0.9, '100г', 100],
-    ['Говядина нежирная', 187, 20.0, 12.4, 0.0, '100г', 100],
-    ['Говядина средняя', 218, 18.5, 16.0, 0.0, '100г', 100],
-    ['Свинина нежирная', 261, 16.4, 21.7, 0.0, '100г', 100],
-    ['Свинина вырезка', 142, 19.4, 7.1, 0.0, '100г', 100],
-    ['Фарш говяжий', 254, 17.2, 20.7, 0.0, '100г', 100],
-    ['Фарш смешанный', 235, 16.1, 19.0, 0.0, '100г', 100],
-    ['Индейка филе', 84, 19.2, 0.7, 0.0, '100г', 100],
-    ['Индейка грудка', 102, 19.9, 2.4, 0.1, '100г', 100],
-    ['Баранина', 209, 15.6, 16.3, 0.0, '100г', 100],
-    ['Печень говяжья', 125, 17.4, 3.1, 5.3, '100г', 100],
-    ['Печень куриная', 137, 18.2, 5.9, 1.5, '100г', 100],
-    ['Сосиски', 256, 10.1, 23.0, 1.6, '100г', 100],
-    ['Колбаса варёная', 270, 12.0, 22.8, 1.5, '100г', 100],
-    ['Ветчина', 190, 16.3, 13.5, 0.3, '100г', 100],
-
-    // Рыба и морепродукты
-    ['Лосось', 208, 20.0, 13.4, 0.0, '100г', 100],
-    ['Семга', 219, 20.7, 15.1, 0.0, '100г', 100],
-    ['Тунец в собственном соку', 96, 22.0, 0.7, 0.0, '100г', 100],
-    ['Тунец свежий', 144, 23.7, 4.9, 0.3, '100г', 100],
-    ['Треска', 78, 17.5, 0.6, 0.0, '100г', 100],
-    ['Минтай', 72, 15.9, 0.9, 0.0, '100г', 100],
-    ['Тилапия', 96, 20.1, 1.7, 0.0, '100г', 100],
-    ['Креветки', 97, 20.3, 1.7, 0.9, '100г', 100],
-    ['Кальмар', 92, 18.0, 2.2, 2.0, '100г', 100],
-    ['Мидии', 77, 11.5, 2.0, 3.3, '100г', 100],
-    ['Скумбрия', 262, 18.0, 20.9, 0.0, '100г', 100],
-    ['Сельдь', 248, 17.7, 19.5, 0.0, '100г', 100],
-    ['Икра красная', 270, 31.5, 13.8, 0.0, '100г', 100],
-
-    // Крупы и злаки
-    ['Гречка варёная', 110, 4.2, 1.1, 21.3, '100г', 100],
-    ['Гречка сухая', 313, 12.6, 3.3, 62.1, '100г', 100],
-    ['Рис белый варёный', 130, 2.7, 0.3, 28.2, '100г', 100],
-    ['Рис бурый варёный', 111, 2.6, 0.9, 22.8, '100г', 100],
-    ['Рис сухой', 344, 6.7, 0.7, 78.9, '100г', 100],
-    ['Овсянка варёная', 88, 3.0, 1.7, 15.0, '100г', 100],
-    ['Овсянка сухая', 389, 17.0, 6.9, 66.2, '100г', 100],
-    ['Перловка варёная', 109, 3.1, 0.4, 22.2, '100г', 100],
-    ['Пшено варёное', 90, 3.0, 0.7, 19.5, '100г', 100],
-    ['Манка', 326, 10.3, 1.0, 70.6, '100г', 100],
-    ['Кукурузная крупа', 328, 8.3, 1.2, 71.0, '100г', 100],
-    ['Булгур варёный', 83, 3.1, 0.2, 18.6, '100г', 100],
-    ['Киноа варёная', 120, 4.4, 1.9, 21.3, '100г', 100],
-    ['Кускус варёный', 112, 3.8, 0.2, 23.2, '100г', 100],
-
-    // Макароны и хлеб
-    ['Паста варёная', 158, 5.8, 0.9, 30.9, '100г', 100],
-    ['Паста сухая', 371, 13.0, 1.5, 74.7, '100г', 100],
-    ['Хлеб белый', 265, 8.1, 3.2, 49.0, '1 ломтик', 30],
-    ['Хлеб ржаной', 259, 8.5, 3.3, 45.8, '1 ломтик', 35],
-    ['Хлеб цельнозерновой', 247, 9.0, 3.0, 44.0, '1 ломтик', 35],
-    ['Лаваш', 277, 9.1, 1.1, 57.1, '100г', 100],
-    ['Багет', 274, 9.1, 1.9, 55.4, '100г', 100],
-
-    // Бобовые
-    ['Чечевица варёная', 116, 9.0, 0.4, 20.1, '100г', 100],
-    ['Нут варёный', 164, 8.9, 2.6, 27.4, '100г', 100],
-    ['Фасоль варёная', 127, 8.7, 0.5, 22.8, '100г', 100],
-    ['Горох варёный', 116, 8.2, 0.8, 20.4, '100г', 100],
-    ['Соя', 446, 34.9, 17.3, 30.2, '100г', 100],
-    ['Тофу', 76, 8.1, 4.2, 1.9, '100г', 100],
-    ['Эдамаме', 122, 11.0, 5.0, 8.9, '100г', 100],
-
-    // Овощи
-    ['Огурец', 15, 0.8, 0.1, 2.5, '100г', 100],
-    ['Помидор', 18, 0.9, 0.2, 3.7, '100г', 100],
-    ['Капуста белокочанная', 27, 1.8, 0.1, 4.7, '100г', 100],
-    ['Капуста брокколи', 34, 2.8, 0.4, 6.6, '100г', 100],
-    ['Капуста цветная', 30, 2.5, 0.3, 5.4, '100г', 100],
-    ['Морковь', 41, 0.9, 0.2, 9.6, '100г', 100],
-    ['Свёкла', 43, 1.5, 0.1, 9.6, '100г', 100],
-    ['Картофель', 77, 2.0, 0.1, 17.0, '100г', 100],
-    ['Картофель отварной', 82, 2.0, 0.1, 18.1, '100г', 100],
-    ['Сладкий перец', 27, 1.0, 0.3, 5.3, '100г', 100],
-    ['Лук репчатый', 41, 1.4, 0.2, 8.2, '100г', 100],
-    ['Чеснок', 149, 6.5, 0.5, 33.1, '1 зубчик', 5],
-    ['Шпинат', 23, 2.9, 0.4, 3.6, '100г', 100],
-    ['Салат листовой', 15, 1.5, 0.2, 2.2, '100г', 100],
-    ['Руккола', 25, 2.6, 0.7, 3.7, '100г', 100],
-    ['Авокадо', 160, 2.0, 14.7, 8.5, '100г', 100],
-    ['Кукуруза', 86, 3.3, 1.2, 18.7, '100г', 100],
-    ['Зелёный горошек', 73, 5.0, 0.2, 13.3, '100г', 100],
-    ['Баклажан', 24, 1.2, 0.1, 4.5, '100г', 100],
-    ['Кабачок', 24, 1.5, 0.3, 4.6, '100г', 100],
-    ['Тыква', 22, 1.0, 0.1, 4.4, '100г', 100],
-    ['Сельдерей', 13, 0.9, 0.1, 2.1, '100г', 100],
-    ['Спаржа', 20, 2.2, 0.1, 3.9, '100г', 100],
-    ['Грибы шампиньоны', 27, 4.3, 1.0, 1.0, '100г', 100],
-
-    // Фрукты и ягоды
-    ['Яблоко', 52, 0.3, 0.4, 13.8, '1 шт', 180],
-    ['Банан', 89, 1.1, 0.3, 22.8, '1 шт', 120],
-    ['Апельсин', 43, 0.9, 0.2, 8.1, '1 шт', 150],
-    ['Мандарин', 38, 0.8, 0.2, 7.5, '1 шт', 80],
-    ['Груша', 57, 0.4, 0.3, 15.2, '1 шт', 170],
-    ['Виноград', 69, 0.6, 0.2, 18.1, '100г', 100],
-    ['Клубника', 30, 0.8, 0.3, 7.5, '100г', 100],
-    ['Черника', 44, 0.7, 0.5, 11.4, '100г', 100],
-    ['Малина', 46, 0.8, 0.5, 11.9, '100г', 100],
-    ['Арбуз', 30, 0.6, 0.1, 7.6, '100г', 100],
-    ['Дыня', 34, 0.8, 0.3, 7.4, '100г', 100],
-    ['Персик', 39, 0.9, 0.1, 9.5, '1 шт', 150],
-    ['Абрикос', 44, 0.9, 0.1, 10.8, '1 шт', 40],
-    ['Слива', 46, 0.7, 0.3, 9.6, '1 шт', 40],
-    ['Киви', 61, 1.1, 0.5, 14.7, '1 шт', 80],
-    ['Манго', 65, 0.5, 0.3, 17.0, '100г', 100],
-    ['Ананас', 50, 0.5, 0.1, 13.1, '100г', 100],
-    ['Грейпфрут', 32, 0.7, 0.2, 6.5, '100г', 100],
-    ['Лимон', 29, 0.9, 0.1, 9.3, '100г', 100],
-
-    // Орехи и семена
-    ['Миндаль', 579, 21.2, 49.9, 21.6, '100г', 100],
-    ['Грецкий орех', 654, 15.2, 65.2, 13.7, '100г', 100],
-    ['Кешью', 553, 18.2, 43.9, 30.2, '100г', 100],
-    ['Фисташки', 562, 20.2, 45.4, 27.2, '100г', 100],
-    ['Фундук', 628, 15.0, 61.5, 16.7, '100г', 100],
-    ['Арахис', 567, 25.8, 49.2, 16.1, '100г', 100],
-    ['Арахисовая паста', 588, 25.1, 50.4, 19.6, '100г', 100],
-    ['Семена чиа', 486, 16.5, 30.7, 42.1, '100г', 100],
-    ['Семена льна', 534, 18.3, 42.2, 28.9, '100г', 100],
-    ['Тыквенные семечки', 559, 30.2, 49.1, 10.7, '100г', 100],
-    ['Подсолнечные семечки', 584, 20.7, 52.9, 10.5, '100г', 100],
-
-    // Масла
-    ['Масло оливковое', 884, 0.0, 100.0, 0.0, '1 ст.л.', 14],
-    ['Масло подсолнечное', 884, 0.0, 100.0, 0.0, '1 ст.л.', 14],
-    ['Масло кокосовое', 862, 0.0, 100.0, 0.0, '1 ст.л.', 14],
-
-    // Соусы и приправы
-    ['Кетчуп', 93, 1.8, 0.1, 22.0, '1 ст.л.', 17],
-    ['Майонез', 680, 2.8, 74.7, 2.6, '1 ст.л.', 15],
-    ['Соевый соус', 53, 8.1, 0.0, 4.9, '1 ст.л.', 16],
-    ['Горчица', 143, 9.9, 6.8, 11.4, '1 ч.л.', 5],
-    ['Мёд', 304, 0.8, 0.0, 82.4, '1 ст.л.', 21],
-    ['Сахар', 387, 0.0, 0.0, 99.8, '1 ч.л.', 5],
-    ['Соль', 0, 0.0, 0.0, 0.0, '1 ч.л.', 6],
-
-    // Напитки
-    ['Кофе чёрный', 2, 0.2, 0.0, 0.3, '1 чашка', 200],
-    ['Кофе латте', 120, 6.0, 5.0, 10.0, '1 чашка', 300],
-    ['Кофе капучино', 80, 4.0, 3.5, 6.0, '1 чашка', 200],
-    ['Чай без сахара', 1, 0.0, 0.0, 0.3, '1 чашка', 200],
-    ['Сок апельсиновый', 45, 0.7, 0.2, 10.4, '100мл', 100],
-    ['Сок яблочный', 46, 0.5, 0.1, 11.3, '100мл', 100],
-    ['Вода', 0, 0.0, 0.0, 0.0, '1 стакан', 250],
-    ['Молоко овсяное', 38, 1.0, 1.5, 6.0, '100мл', 100],
-    ['Молоко миндальное', 24, 0.6, 1.5, 3.2, '100мл', 100],
-
-    // Готовые блюда и фастфуд
-    ['Омлет', 184, 10.0, 14.0, 3.0, '100г', 100],
-    ['Яичница', 192, 12.4, 15.0, 1.3, '100г', 100],
-    ['Каша овсяная на молоке', 102, 3.9, 3.3, 14.7, '100г', 100],
-    ['Борщ', 57, 2.8, 2.1, 7.3, '100г', 100],
-    ['Куриный суп', 36, 3.1, 1.3, 3.2, '100г', 100],
-    ['Греческий салат', 100, 3.5, 7.0, 6.0, '100г', 100],
-    ['Цезарь с курицей', 196, 14.5, 13.5, 5.2, '100г', 100],
-    ['Пицца Маргарита', 250, 10.4, 9.8, 30.7, '1 кусок', 120],
-    ['Бургер', 295, 16.0, 14.0, 25.0, '1 шт', 200],
-    ['Суши ролл', 140, 6.5, 3.5, 22.0, '1 ролл', 150],
-    ['Блин', 233, 6.1, 12.3, 26.0, '1 шт', 60],
-    ['Сырник', 230, 14.0, 8.0, 25.0, '1 шт', 70],
-    ['Котлета', 248, 16.0, 18.0, 5.0, '1 шт', 80],
-    ['Пельмени', 275, 11.8, 14.0, 26.0, '100г', 100],
-    ['Вареники с картошкой', 223, 7.0, 4.5, 40.0, '100г', 100],
-
-    // Сладости
-    ['Шоколад тёмный 70%', 598, 7.8, 42.6, 45.9, '100г', 100],
-    ['Шоколад молочный', 535, 6.9, 29.7, 59.4, '100г', 100],
-    ['Печенье', 417, 6.7, 14.8, 65.8, '1 шт', 15],
-    ['Мороженое', 207, 3.5, 11.0, 24.0, '1 шарик', 100],
-    ['Творожный торт', 320, 7.0, 18.0, 33.0, '100г', 100],
-    ['Зефир', 299, 0.8, 0.1, 78.3, '1 шт', 30],
-    ['Протеиновый батончик', 320, 20.0, 8.0, 42.0, '1 шт', 60],
-
-    // Спортивное питание
-    ['Протеин сывороточный', 370, 75.0, 5.0, 10.0, '1 мерная ложка', 30],
-    ['Протеин казеиновый', 360, 76.0, 3.0, 8.0, '1 мерная ложка', 30],
-    ['Творожный протеин', 100, 17.0, 1.0, 6.0, '100г', 100],
-  ]
-
-  const insertMany = db.transaction((items) => {
-    for (const item of items) {
-      insert.run(...item)
+function createTursoProxy(client) {
+  // Since all existing code uses sync API, we need a sync-compatible layer
+  // We use Atomics + SharedArrayBuffer for true sync async bridging
+  
+  const { Worker, isMainThread, parentPort, workerData } = require('worker_threads')
+  const path = require('path')
+  
+  // Simple synchronous execution via execFileSync trick
+  function execSync(sql, params = []) {
+    const { spawnSync } = require('child_process')
+    const script = `
+      const { createClient } = require('@libsql/client')
+      const client = createClient({ url: '${TURSO_URL}', authToken: '${TURSO_TOKEN}' })
+      client.execute({ sql: ${JSON.stringify(sql)}, args: ${JSON.stringify(params)} })
+        .then(r => { process.stdout.write(JSON.stringify({ ok: true, data: r })); process.exit(0) })
+        .catch(e => { process.stdout.write(JSON.stringify({ ok: false, error: e.message })); process.exit(0) })
+    `
+    const result = spawnSync('node', ['-e', script], { 
+      encoding: 'utf8', timeout: 8000,
+      cwd: path.join(__dirname, '..')
+    })
+    if (result.error) throw result.error
+    try {
+      const parsed = JSON.parse(result.stdout)
+      if (!parsed.ok) throw new Error(parsed.error)
+      return parsed.data
+    } catch(e) {
+      throw new Error('DB error: ' + result.stdout + result.stderr)
     }
-  })
-
-  insertMany(foods)
-  console.log(`✅ Seeded ${foods.length} foods`)
-}
-_seedFoods(db)
-
-// Seed recipes  
-function _seedRecipes(db) {
-  // Clear and reseed
-  // Check if already seeded with real recipes (ones that have image_url)
-  const hasReal = db.prepare("SELECT COUNT(*) as cnt FROM recipes WHERE image_url IS NOT NULL AND image_url != ''").get()
-  if (hasReal.cnt > 0) return
-
-  db.prepare("DELETE FROM recipes WHERE image_url IS NULL OR image_url = ''").run()
-
-  const insert = db.prepare(`
-    INSERT INTO recipes (name, calories, protein, fat, carbs, time, emoji, tags, image_url, ingredients, steps, servings)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `)
-
-  const recipes = [
-    [
-      'Греческий салат',
-      180, 6, 12, 10, 10, '🥗',
-      '["Лёгкий","Без готовки","ПП"]',
-      'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=400&q=80',
-      JSON.stringify([
-        { name: 'Помидоры черри', amount: '200г' },
-        { name: 'Огурец', amount: '1 шт' },
-        { name: 'Сыр Фета', amount: '100г' },
-        { name: 'Оливки', amount: '50г' },
-        { name: 'Красный лук', amount: '½ шт' },
-        { name: 'Оливковое масло', amount: '2 ст.л.' },
-        { name: 'Орегано', amount: '1 ч.л.' },
-        { name: 'Соль, перец', amount: 'по вкусу' }
-      ]),
-      JSON.stringify([
-        { step: 1, text: 'Помидоры черри разрежь пополам, огурец нарежь крупными кубиками.' },
-        { step: 2, text: 'Красный лук нарежь тонкими полукольцами.' },
-        { step: 3, text: 'Выложи овощи в миску, добавь оливки.' },
-        { step: 4, text: 'Сверху покроши фету крупными кусками.' },
-        { step: 5, text: 'Полей оливковым маслом, посыпь орегано, солью и перцем.' },
-        { step: 6, text: 'Аккуратно перемешай и сразу подавай.' }
-      ]),
-      2
-    ],
-    [
-      'Куриная грудка с брокколи',
-      320, 42, 8, 12, 25, '🍗',
-      '["Белок","ПП","Фитнес"]',
-      'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&q=80',
-      JSON.stringify([
-        { name: 'Куриная грудка', amount: '300г' },
-        { name: 'Брокколи', amount: '200г' },
-        { name: 'Чеснок', amount: '2 зубчика' },
-        { name: 'Оливковое масло', amount: '1 ст.л.' },
-        { name: 'Лимонный сок', amount: '1 ст.л.' },
-        { name: 'Соль, перец, паприка', amount: 'по вкусу' }
-      ]),
-      JSON.stringify([
-        { step: 1, text: 'Куриную грудку нарежь на медальоны толщиной 1-1.5 см, отбей немного.' },
-        { step: 2, text: 'Посоли, поперчи, посыпь паприкой с обеих сторон.' },
-        { step: 3, text: 'Разогрей сковороду с маслом на среднем огне, обжарь курицу 4-5 минут с каждой стороны.' },
-        { step: 4, text: 'Брокколи раздели на соцветия, отвари в подсоленной воде 5 минут или приготовь на пару.' },
-        { step: 5, text: 'Чеснок измельчи и добавь к брокколи с лимонным соком.' },
-        { step: 6, text: 'Подавай курицу с брокколи, можно добавить немного соевого соуса.' }
-      ]),
-      2
-    ],
-    [
-      'Смузи-боул с ягодами',
-      280, 8, 6, 48, 10, '🫐',
-      '["Завтрак","Вегетарианский","Быстро"]',
-      'https://images.unsplash.com/photo-1490323914169-4b97c1f4c2ab?w=400&q=80',
-      JSON.stringify([
-        { name: 'Замороженная черника', amount: '150г' },
-        { name: 'Замороженная малина', amount: '100г' },
-        { name: 'Банан', amount: '1 шт' },
-        { name: 'Греческий йогурт', amount: '100г' },
-        { name: 'Мёд', amount: '1 ч.л.' },
-        { name: 'Гранола', amount: '30г' },
-        { name: 'Свежие ягоды для украшения', amount: 'горсть' },
-        { name: 'Семена чиа', amount: '1 ч.л.' }
-      ]),
-      JSON.stringify([
-        { step: 1, text: 'Замороженные ягоды и банан положи в блендер.' },
-        { step: 2, text: 'Добавь йогурт и мёд.' },
-        { step: 3, text: 'Взбей до густой однородной массы. Смузи должен быть очень густым — как мороженое.' },
-        { step: 4, text: 'Вылей в глубокую миску.' },
-        { step: 5, text: 'Украси гранолой, свежими ягодами и семенами чиа.' },
-        { step: 6, text: 'Подавай сразу, пока не растаяло!' }
-      ]),
-      1
-    ],
-    [
-      'Паста с лососем в сливочном соусе',
-      520, 28, 22, 48, 20, '🍝',
-      '["Ужин","Рыба","Быстро"]',
-      'https://images.unsplash.com/photo-1563379926898-05f4575a45d8?w=400&q=80',
-      JSON.stringify([
-        { name: 'Паста фетучини', amount: '150г' },
-        { name: 'Лосось', amount: '200г' },
-        { name: 'Сливки 20%', amount: '150мл' },
-        { name: 'Чеснок', amount: '2 зубчика' },
-        { name: 'Пармезан', amount: '30г' },
-        { name: 'Шпинат', amount: '50г' },
-        { name: 'Лимон', amount: '½ шт' },
-        { name: 'Укроп', amount: 'пучок' }
-      ]),
-      JSON.stringify([
-        { step: 1, text: 'Отвари пасту по инструкции до состояния al dente, сохрани ½ стакана воды от варки.' },
-        { step: 2, text: 'Лосось нарежь кубиками 2-3 см, посоли и поперчи.' },
-        { step: 3, text: 'Обжарь лосось на сковороде 2-3 минуты, не пересуши — он должен остаться нежным.' },
-        { step: 4, text: 'В той же сковороде обжарь чеснок 30 секунд, влей сливки.' },
-        { step: 5, text: 'Добавь шпинат, туши 2 минуты. Если соус густой, добавь воду от пасты.' },
-        { step: 6, text: 'Соедини пасту с соусом, добавь лосось, сок лимона и укроп.' },
-        { step: 7, text: 'Подавай сразу, посыпав тёртым пармезаном.' }
-      ]),
-      2
-    ],
-    [
-      'Омлет с авокадо и томатами',
-      310, 18, 22, 8, 10, '🍳',
-      '["Завтрак","Быстро","Белок"]',
-      'https://images.unsplash.com/photo-1510693206972-df098062cb71?w=400&q=80',
-      JSON.stringify([
-        { name: 'Яйца', amount: '3 шт' },
-        { name: 'Авокадо', amount: '½ шт' },
-        { name: 'Помидоры черри', amount: '5-6 шт' },
-        { name: 'Сыр моцарелла', amount: '40г' },
-        { name: 'Молоко', amount: '2 ст.л.' },
-        { name: 'Масло сливочное', amount: '1 ч.л.' },
-        { name: 'Базилик', amount: 'несколько листиков' },
-        { name: 'Соль, перец', amount: 'по вкусу' }
-      ]),
-      JSON.stringify([
-        { step: 1, text: 'Яйца взбей с молоком, солью и перцем до однородности.' },
-        { step: 2, text: 'Авокадо нарежь ломтиками, черри разрежь пополам.' },
-        { step: 3, text: 'Разогрей сковороду с маслом на среднем огне.' },
-        { step: 4, text: 'Вылей яичную смесь, когда края начнут схватываться — уложи начинку на одну половину.' },
-        { step: 5, text: 'Посыпь моцареллой, сложи омлет пополам и накрой крышкой на 1 минуту.' },
-        { step: 6, text: 'Подавай сразу с листиками базилика.' }
-      ]),
-      1
-    ],
-    [
-      'Боул с киноа и нутом',
-      420, 18, 14, 58, 20, '🥙',
-      '["Обед","Вегетарианский","ПП","Фитнес"]',
-      'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&q=80',
-      JSON.stringify([
-        { name: 'Киноа', amount: '80г сухой' },
-        { name: 'Нут консервированный', amount: '150г' },
-        { name: 'Огурец', amount: '1 шт' },
-        { name: 'Помидоры черри', amount: '10 шт' },
-        { name: 'Руккола', amount: '40г' },
-        { name: 'Тахини', amount: '2 ст.л.' },
-        { name: 'Лимонный сок', amount: '2 ст.л.' },
-        { name: 'Чеснок', amount: '1 зубчик' },
-        { name: 'Паприка, соль', amount: 'по вкусу' }
-      ]),
-      JSON.stringify([
-        { step: 1, text: 'Киноа промой и отвари в подсоленной воде 15 минут (1:2), дай постоять 5 минут под крышкой.' },
-        { step: 2, text: 'Нут слей, промой и обсуши. Обжарь на сухой сковороде с паприкой и солью 5 минут до хрустящей корочки.' },
-        { step: 3, text: 'Приготовь заправку: смешай тахини, лимонный сок, чеснок и 2-3 ст.л. воды до кремовой консистенции.' },
-        { step: 4, text: 'Огурец нарежь кубиками, черри разрежь пополам.' },
-        { step: 5, text: 'В боул выложи киноа, сверху — рукколу, овощи и нут.' },
-        { step: 6, text: 'Полей заправкой тахини и сразу подавай.' }
-      ]),
-      2
-    ],
-    [
-      'Творожные сырники',
-      230, 14, 8, 26, 20, '🧁',
-      '["Завтрак","Десерт","Быстро"]',
-      'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=400&q=80',
-      JSON.stringify([
-        { name: 'Творог 5%', amount: '300г' },
-        { name: 'Яйцо', amount: '1 шт' },
-        { name: 'Мука', amount: '3 ст.л.' },
-        { name: 'Сахар', amount: '2 ст.л.' },
-        { name: 'Ванилин', amount: 'щепотка' },
-        { name: 'Соль', amount: 'щепотка' },
-        { name: 'Масло для жарки', amount: '1 ст.л.' },
-        { name: 'Сметана или варенье', amount: 'для подачи' }
-      ]),
-      JSON.stringify([
-        { step: 1, text: 'Творог хорошо разомни вилкой или протри через сито для однородности.' },
-        { step: 2, text: 'Добавь яйцо, сахар, ванилин и соль, перемешай.' },
-        { step: 3, text: 'Всыпь муку и замеси мягкое тесто. Оно должно держать форму но не быть тугим.' },
-        { step: 4, text: 'Руки обваляй в муке, слепи сырники толщиной 1.5 см.' },
-        { step: 5, text: 'Обжарь на среднем огне 3-4 минуты с каждой стороны до золотистой корочки.' },
-        { step: 6, text: 'Подавай горячими со сметаной или вареньем.' }
-      ]),
-      4
-    ],
-    [
-      'Куриный суп с лапшой',
-      180, 18, 4, 16, 40, '🍲',
-      '["Обед","Сытный","ПП"]',
-      'https://images.unsplash.com/photo-1547592166-23ac45744acd?w=400&q=80',
-      JSON.stringify([
-        { name: 'Куриная грудка', amount: '300г' },
-        { name: 'Морковь', amount: '1 шт' },
-        { name: 'Картофель', amount: '2 шт' },
-        { name: 'Лук репчатый', amount: '1 шт' },
-        { name: 'Лапша яичная', amount: '80г' },
-        { name: 'Чеснок', amount: '2 зубчика' },
-        { name: 'Лавровый лист', amount: '2 шт' },
-        { name: 'Укроп, петрушка', amount: 'пучок' },
-        { name: 'Соль, перец горошком', amount: 'по вкусу' }
-      ]),
-      JSON.stringify([
-        { step: 1, text: 'Куриную грудку залей 1.5 л холодной воды, доведи до кипения, сними пену.' },
-        { step: 2, text: 'Добавь целую луковицу, лавровый лист и перец горошком. Вари на малом огне 25 минут.' },
-        { step: 3, text: 'Вынь курицу, бульон процеди. Лук выброси.' },
-        { step: 4, text: 'Морковь нарежь кружочками, картофель кубиками, добавь в бульон. Вари 10 минут.' },
-        { step: 5, text: 'Курицу разбери на волокна, верни в суп.' },
-        { step: 6, text: 'Добавь лапшу, вари ещё 5 минут. В конце — чеснок и зелень.' },
-        { step: 7, text: 'Посоли по вкусу и подавай горячим.' }
-      ]),
-      4
-    ]
-  ]
-
-  // Add columns if they don't exist
-  try {
-    db.exec(`ALTER TABLE recipes ADD COLUMN protein REAL DEFAULT 0`)
-    db.exec(`ALTER TABLE recipes ADD COLUMN fat REAL DEFAULT 0`)
-    db.exec(`ALTER TABLE recipes ADD COLUMN carbs REAL DEFAULT 0`)
-    db.exec(`ALTER TABLE recipes ADD COLUMN image_url TEXT`)
-    db.exec(`ALTER TABLE recipes ADD COLUMN ingredients TEXT DEFAULT '[]'`)
-    db.exec(`ALTER TABLE recipes ADD COLUMN steps TEXT DEFAULT '[]'`)
-    db.exec(`ALTER TABLE recipes ADD COLUMN servings INTEGER DEFAULT 2`)
-  } catch (e) {
-    // columns already exist
   }
 
-  const insertFull = db.prepare(`
-    INSERT INTO recipes (name, calories, protein, fat, carbs, time, emoji, tags, image_url, ingredients, steps, servings)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `)
+  function rowToObj(columns, row) {
+    const obj = {}
+    columns.forEach((col, i) => { obj[col] = row[i] !== undefined ? row[i] : null })
+    return obj
+  }
 
-  const insertMany = db.transaction((items) => {
-    for (const item of items) insertFull.run(...item)
-  })
-
-  insertMany(recipes)
-  console.log(`✅ Seeded ${recipes.length} recipes`)
+  return {
+    prepare(sql) {
+      return {
+        run(...params) {
+          const flat = params.flat()
+          const r = execSync(sql, flat)
+          return { lastInsertRowid: Number(r.lastInsertRowid || 0), changes: r.rowsAffected || 0 }
+        },
+        get(...params) {
+          const flat = params.flat()
+          const r = execSync(sql, flat)
+          return r.rows?.length ? rowToObj(r.columns, r.rows[0]) : undefined
+        },
+        all(...params) {
+          const flat = params.flat()
+          const r = execSync(sql, flat)
+          return (r.rows || []).map(row => rowToObj(r.columns, row))
+        }
+      }
+    },
+    exec(sql) {
+      try { execSync(sql, []) } catch(e) { /* ignore alter table errors */ }
+    },
+    transaction(fn) {
+      return (items) => { for (const item of items) fn([item]) }
+    }
+  }
 }
-_seedRecipes(db)
 
-module.exports = db
+async function initTurso(client) {
+  const tables = [
+    `CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, telegram_id TEXT UNIQUE NOT NULL,
+      name TEXT, username TEXT, calories INTEGER DEFAULT 2000,
+      goal TEXT DEFAULT 'health', activity TEXT DEFAULT 'medium',
+      age INTEGER, weight REAL, height REAL, gender TEXT DEFAULT 'female',
+      onboarded INTEGER DEFAULT 0,
+      notifications_enabled INTEGER DEFAULT 1,
+      notify_water INTEGER DEFAULT 1, notify_meals INTEGER DEFAULT 1,
+      notify_events INTEGER DEFAULT 1, notify_morning INTEGER DEFAULT 1,
+      created_at TEXT DEFAULT (datetime('now')))`,
+    `CREATE TABLE IF NOT EXISTS meals (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
+      name TEXT NOT NULL, calories INTEGER DEFAULT 0,
+      protein REAL DEFAULT 0, fat REAL DEFAULT 0, carbs REAL DEFAULT 0,
+      type TEXT DEFAULT 'snack', date TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')))`,
+    `CREATE TABLE IF NOT EXISTS trackers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
+      date TEXT NOT NULL, water REAL DEFAULT 0, steps INTEGER DEFAULT 0,
+      sleep REAL DEFAULT 0, pulse INTEGER DEFAULT 72,
+      UNIQUE(user_id, date))`,
+    `CREATE TABLE IF NOT EXISTS workouts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
+      type TEXT NOT NULL, duration INTEGER DEFAULT 30,
+      level TEXT DEFAULT 'Средний', format TEXT DEFAULT 'Онлайн',
+      description TEXT, video_url TEXT, thumbnail_url TEXT, instructor TEXT)`,
+    `CREATE TABLE IF NOT EXISTS subscriptions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
+      studio TEXT NOT NULL, total INTEGER DEFAULT 8, used INTEGER DEFAULT 0, expires_at TEXT)`,
+    `CREATE TABLE IF NOT EXISTS recipes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
+      calories INTEGER DEFAULT 0, protein REAL DEFAULT 0,
+      fat REAL DEFAULT 0, carbs REAL DEFAULT 0,
+      time INTEGER DEFAULT 15, emoji TEXT DEFAULT '🍽',
+      tags TEXT DEFAULT '[]', image_url TEXT,
+      ingredients TEXT DEFAULT '[]', steps TEXT DEFAULT '[]', servings INTEGER DEFAULT 2)`,
+    `CREATE TABLE IF NOT EXISTS foods (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
+      calories INTEGER DEFAULT 0, protein REAL DEFAULT 0,
+      fat REAL DEFAULT 0, carbs REAL DEFAULT 0,
+      unit TEXT DEFAULT '100г', unit_weight INTEGER DEFAULT 100)`,
+    `CREATE TABLE IF NOT EXISTS events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL,
+      type TEXT DEFAULT 'workout', date TEXT NOT NULL,
+      time TEXT DEFAULT '10:00', end_time TEXT DEFAULT '11:00',
+      emoji TEXT DEFAULT '🌸', location TEXT DEFAULT '',
+      description TEXT DEFAULT '', link TEXT DEFAULT '',
+      color TEXT DEFAULT '#E8437A', created_at TEXT DEFAULT (datetime('now')))`,
+    `CREATE TABLE IF NOT EXISTS places (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
+      type TEXT DEFAULT 'studio', address TEXT, lat REAL, lng REAL,
+      description TEXT, phone TEXT, website TEXT,
+      emoji TEXT DEFAULT '📍', color TEXT DEFAULT '#E8437A',
+      rating REAL DEFAULT 0, tags TEXT DEFAULT '[]',
+      parent_id INTEGER DEFAULT NULL, created_at TEXT DEFAULT (datetime('now')))`,
+    `CREATE TABLE IF NOT EXISTS friendships (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL, friend_id INTEGER NOT NULL,
+      status TEXT DEFAULT 'pending', created_at TEXT DEFAULT (datetime('now')))`,
+    `CREATE TABLE IF NOT EXISTS user_locations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL UNIQUE,
+      lat REAL, lng REAL, share_location INTEGER DEFAULT 0,
+      updated_at TEXT DEFAULT (datetime('now')))`,
+    `CREATE TABLE IF NOT EXISTS notifications_queue (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER,
+      type TEXT, data TEXT, sent INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')))`
+  ]
+  for (const sql of tables) {
+    try { await client.execute(sql) } catch(e) {}
+  }
+}
+
+function initSqlite(db) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, telegram_id TEXT UNIQUE NOT NULL,
+      name TEXT, username TEXT, calories INTEGER DEFAULT 2000,
+      goal TEXT DEFAULT 'health', activity TEXT DEFAULT 'medium',
+      age INTEGER, weight REAL, height REAL, gender TEXT DEFAULT 'female',
+      onboarded INTEGER DEFAULT 0,
+      notifications_enabled INTEGER DEFAULT 1,
+      notify_water INTEGER DEFAULT 1, notify_meals INTEGER DEFAULT 1,
+      notify_events INTEGER DEFAULT 1, notify_morning INTEGER DEFAULT 1,
+      created_at TEXT DEFAULT (datetime('now')));
+    CREATE TABLE IF NOT EXISTS meals (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
+      name TEXT NOT NULL, calories INTEGER DEFAULT 0,
+      protein REAL DEFAULT 0, fat REAL DEFAULT 0, carbs REAL DEFAULT 0,
+      type TEXT DEFAULT 'snack', date TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')));
+    CREATE TABLE IF NOT EXISTS trackers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
+      date TEXT NOT NULL, water REAL DEFAULT 0, steps INTEGER DEFAULT 0,
+      sleep REAL DEFAULT 0, pulse INTEGER DEFAULT 72,
+      UNIQUE(user_id, date));
+    CREATE TABLE IF NOT EXISTS workouts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
+      type TEXT NOT NULL, duration INTEGER DEFAULT 30,
+      level TEXT DEFAULT 'Средний', format TEXT DEFAULT 'Онлайн',
+      description TEXT, video_url TEXT, thumbnail_url TEXT, instructor TEXT);
+    CREATE TABLE IF NOT EXISTS subscriptions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
+      studio TEXT NOT NULL, total INTEGER DEFAULT 8, used INTEGER DEFAULT 0);
+    CREATE TABLE IF NOT EXISTS recipes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
+      calories INTEGER DEFAULT 0, protein REAL DEFAULT 0,
+      fat REAL DEFAULT 0, carbs REAL DEFAULT 0,
+      time INTEGER DEFAULT 15, emoji TEXT DEFAULT '🍽',
+      tags TEXT DEFAULT '[]', image_url TEXT,
+      ingredients TEXT DEFAULT '[]', steps TEXT DEFAULT '[]', servings INTEGER DEFAULT 2);
+    CREATE TABLE IF NOT EXISTS foods (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
+      calories INTEGER DEFAULT 0, protein REAL DEFAULT 0,
+      fat REAL DEFAULT 0, carbs REAL DEFAULT 0,
+      unit TEXT DEFAULT '100г', unit_weight INTEGER DEFAULT 100);
+    CREATE TABLE IF NOT EXISTS events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL,
+      type TEXT DEFAULT 'workout', date TEXT NOT NULL,
+      time TEXT DEFAULT '10:00', end_time TEXT DEFAULT '11:00',
+      emoji TEXT DEFAULT '🌸', location TEXT DEFAULT '',
+      description TEXT DEFAULT '', link TEXT DEFAULT '',
+      color TEXT DEFAULT '#E8437A', created_at TEXT DEFAULT (datetime('now')));
+    CREATE TABLE IF NOT EXISTS places (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
+      type TEXT DEFAULT 'studio', address TEXT, lat REAL, lng REAL,
+      description TEXT, phone TEXT, website TEXT,
+      emoji TEXT DEFAULT '📍', color TEXT DEFAULT '#E8437A',
+      rating REAL DEFAULT 0, tags TEXT DEFAULT '[]',
+      parent_id INTEGER DEFAULT NULL, created_at TEXT DEFAULT (datetime('now')));
+    CREATE TABLE IF NOT EXISTS friendships (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL, friend_id INTEGER NOT NULL,
+      status TEXT DEFAULT 'pending', created_at TEXT DEFAULT (datetime('now')));
+    CREATE TABLE IF NOT EXISTS user_locations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL UNIQUE,
+      lat REAL, lng REAL, share_location INTEGER DEFAULT 0,
+      updated_at TEXT DEFAULT (datetime('now')));
+    CREATE TABLE IF NOT EXISTS notifications_queue (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER,
+      type TEXT, data TEXT, sent INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')));
+  `)
+  console.log('✅ SQLite schema ready')
+}
