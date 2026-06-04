@@ -31,6 +31,7 @@ app.use('/api/trackers', (req, res, next) => { req.url = '/'; miscRoutes(req, re
 app.use('/api', miscRoutes)
 
 app.get('/health', (req, res) => res.json({ ok: true, version: '1.0.0' }))
+app.get('/api/health', (req, res) => res.json({ ok: true, version: '1.0.0' }))
 
 // Start notification scheduler
 require('./notifications')
