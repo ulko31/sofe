@@ -375,6 +375,12 @@
       </div>
       <div class="form-group"><label>Адрес</label><input type="text" id="place-address" placeholder="ул. Тверская, 14"></div>
       <div class="form-group"><label>Теги (через запятую)</label><input type="text" id="place-tags" placeholder="Йога, Пилатес, Растяжка"></div>
+      <div class="form-group">
+        <label>Это филиал (выбери основное место)</label>
+        <select id="place-parent">
+          <option value="">— Основное место (не филиал)</option>
+        </select>
+      </div>
       <div class="form-group"><label>Телефон</label><input type="text" id="place-phone" placeholder="+7 495 000-00-00"></div>
       <div class="form-group"><label>Сайт</label><input type="text" id="place-website" placeholder="https://..."></div>
       <div class="form-group"><label>Описание</label><textarea id="place-desc" rows="2" placeholder="Описание места..."></textarea></div>
@@ -980,6 +986,20 @@ async function loadPlacesAdmin() {
   }
 }
 
+async function populatePlaceParents(currentId) {
+  const sel = document.getElementById('place-parent')
+  sel.innerHTML = '<option value="">— Основное место (не филиал)</option>'
+  try {
+    const data = await apiFetch('/admin/places')
+    ;(data.places || []).filter(p => !p.parent_id && p.id !== currentId).forEach(p => {
+      const opt = document.createElement('option')
+      opt.value = p.id
+      opt.textContent = p.emoji + ' ' + p.name
+      sel.appendChild(opt)
+    })
+  } catch(e) {}
+}
+
 function openPlaceModal(id) {
   const p = id ? allPlaces.find(x => x.id === id) : {}
   document.getElementById('place-id').value = p?.id || ''
@@ -994,6 +1014,7 @@ function openPlaceModal(id) {
   document.getElementById('place-website').value = p?.website || ''
   document.getElementById('place-desc').value = p?.description || ''
   document.getElementById('place-tags').value = (p?.tags || []).join(', ')
+  populatePlaceParents(id || null)
   document.getElementById('place-modal').classList.remove('hidden')
 }
 
@@ -1014,7 +1035,8 @@ async function savePlace() {
     website: document.getElementById('place-website').value,
     description: document.getElementById('place-desc').value,
     tags: document.getElementById('place-tags').value.split(',').map(t => t.trim()).filter(Boolean),
-    color: document.getElementById('place-type').value === 'cafe' ? '#4CAF50' : document.getElementById('place-type').value === 'spa' ? '#9B59B6' : '#E8437A'
+    color: document.getElementById('place-type').value === 'cafe' ? '#4CAF50' : document.getElementById('place-type').value === 'spa' ? '#9B59B6' : '#E8437A',
+    parent_id: document.getElementById('place-parent').value || null
   }
   const id = document.getElementById('place-id').value
   try {
