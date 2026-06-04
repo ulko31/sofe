@@ -15,9 +15,36 @@ export default function App() {
   const { user } = useTelegram()
   const [tab, setTab] = useState('home')
   const [showAI, setShowAI] = useState(false)
+  const [appUser, setAppUser] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [needsOnboarding, setNeedsOnboarding] = useState(false)
   const [pendingFriendToken, setPendingFriendToken] = useState(null)
 
-  // Auto-accept friend invite when user loads
+  // Load user
+  useEffect(() => {
+    if (!user) return
+    getMe()
+      .then(r => {
+        setAppUser(r.data.user)
+        setNeedsOnboarding(!r.data.user.onboarded)
+        setLoading(false)
+      })
+      .catch(() => { setNeedsOnboarding(true); setLoading(false) })
+  }, [user])
+
+  useEffect(() => {
+    if (!window.Telegram?.WebApp?.initData) setLoading(false)
+  }, [])
+
+  // Check friend invite on start
+  useEffect(() => {
+    const startParam = window.Telegram?.WebApp?.initDataUnsafe?.start_param || ''
+    if (startParam.startsWith('friend_')) {
+      setPendingFriendToken(startParam.replace('friend_', ''))
+    }
+  }, [])
+
+  // Auto-accept friend invite when user is ready
   useEffect(() => {
     if (!pendingFriendToken || !appUser) return
     api.post('/friends/accept-invite', { token: pendingFriendToken })
@@ -26,54 +53,8 @@ export default function App() {
         if (res.data.success) alert(`✅ Вы теперь подруги с ${res.data.friend.name}! 🌸`)
         else if (res.data.already_friends) alert('Вы уже подруги!')
       })
-      .catch(e => { console.error('Accept error:', e); setPendingFriendToken(null) })
+      .catch(() => setPendingFriendToken(null))
   }, [pendingFriendToken, appUser])
-
-  useEffect(() => {
-    const tg = window.Telegram?.WebApp
-    const startParam = tg?.initDataUnsafe?.start_param || ''
-    console.log('App startParam:', startParam)
-
-    if (startParam.startsWith('friend_')) {
-      const token = startParam.replace('friend_', '')
-      setPendingFriendToken(token)
-      // Auto-accept invite when user is loaded
-    }
-  }, [])
-
-  // Auto-accept friend invite when user is ready
-  useEffect(() => {
-    if (!pendingFriendToken || !appUser) return
-    const doAccept = async () => {
-      try {
-        const res = await api.post('/friends/accept-invite', { token: pendingFriendToken })
-        setPendingFriendToken(null)
-        if (res.data.success) {
-          alert(`✅ Вы теперь подруги с ${res.data.friend.name}! 🌸`)
-        } else if (res.data.already_friends) {
-          alert(`Вы уже подруги с ${res.data.friend?.name || 'пользователем'}!`)
-        }
-      } catch(e) {
-        console.error('Auto-accept error:', e.message)
-        setPendingFriendToken(null)
-      }
-    }
-    doAccept()
-  }, [pendingFriendToken, appUser])
-  const [appUser, setAppUser] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [needsOnboarding, setNeedsOnboarding] = useState(false)
-
-  useEffect(() => {
-    if (!user) return
-    getMe()
-      .then(r => { setAppUser(r.data.user); setNeedsOnboarding(!r.data.user.onboarded); setLoading(false) })
-      .catch(() => { setNeedsOnboarding(true); setLoading(false) })
-  }, [user])
-
-  useEffect(() => {
-    if (!window.Telegram?.WebApp?.initData) setLoading(false)
-  }, [])
 
   if (loading) return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
@@ -82,14 +63,14 @@ export default function App() {
     </div>
   )
 
-  if (needsOnboarding) return <Onboarding onComplete={(u) => { setAppUser(u); setNeedsOnboarding(false) }} tgUser={user} />
+  if (needsOnboarding) return (
+    <Onboarding onComplete={(u) => { setAppUser(u); setNeedsOnboarding(false) }} tgUser={user} />
+  )
+
+  if (showAI) return <AIAssistant user={appUser} onBack={() => setShowAI(false)} />
 
   const screens = { home: Home, workouts: Workouts, nutrition: Nutrition, map: MapScreen, calendar: Calendar, profile: Profile }
   const Screen = screens[tab]
-
-  if (showAI) {
-    return <AIAssistant user={appUser} onBack={() => setShowAI(false)} />
-  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
