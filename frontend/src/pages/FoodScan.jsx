@@ -20,11 +20,11 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
   useEffect(() => () => stopQuagga(), [])
 
   useEffect(() => {
+    if (!initialMode) return
     if (initialMode === 'photo') {
-      // Auto-open camera for photo
-      setTimeout(() => fileRef.current?.click(), 300)
+      setTimeout(() => fileRef.current?.click(), 400)
     } else if (initialMode === 'barcode') {
-      setMode('barcode')
+      setTimeout(() => startBarcodeScanner(), 400)
     }
   }, [initialMode])
 
