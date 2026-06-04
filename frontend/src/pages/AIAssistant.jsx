@@ -146,8 +146,8 @@ export default function AIAssistant({ user, onBack }) {
         <button onClick={onBack} style={{ color: 'white', fontSize: 22, background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
           <i className="ti ti-arrow-left" />
         </button>
-        <div style={{ width: 44, height: 44, flexShrink: 0 }}>
-          <img src="/mascot.svg" alt="SOFE" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+        <div style={{ width: 44, height: 44, flexShrink: 0, background: 'rgba(255,255,255,0.9)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <img src="/mascot.svg" alt="SOFE" style={{ width: '85%', height: '85%', objectFit: 'contain' }} />
         </div>
         <div>
           <div style={{ color: 'white', fontWeight: 800, fontSize: 16 }}>SOFE ИИ-ассистент</div>
@@ -160,8 +160,8 @@ export default function AIAssistant({ user, onBack }) {
         {messages.map((msg, i) => (
           <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
             {msg.role === 'assistant' && (
-              <div style={{ width: 36, height: 36, marginRight: 8, flexShrink: 0, alignSelf: 'flex-end' }}>
-              <img src="/mascot.svg" alt="SOFE" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+              <div style={{ width: 36, height: 36, marginRight: 8, flexShrink: 0, alignSelf: 'flex-end', background: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.1)' }}>
+              <img src="/mascot.svg" alt="SOFE" style={{ width: '85%', height: '85%', objectFit: 'contain' }} />
             </div>
             )}
             <div style={{
@@ -180,8 +180,8 @@ export default function AIAssistant({ user, onBack }) {
 
         {loading && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ width: 36, height: 36, flexShrink: 0 }}>
-              <img src="/mascot.svg" alt="SOFE" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+            <div style={{ width: 36, height: 36, flexShrink: 0, background: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.1)' }}>
+              <img src="/mascot.svg" alt="SOFE" style={{ width: '85%', height: '85%', objectFit: 'contain' }} />
             </div>
             <div style={{ background: 'var(--white)', borderRadius: '18px 18px 18px 4px', padding: '12px 16px', border: '0.5px solid var(--border)' }}>
               <div style={{ display: 'flex', gap: 4 }}>
