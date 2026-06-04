@@ -71,16 +71,71 @@ async function askGroq(systemPrompt, userMessage) {
 bot.onText(/\/start friend_(.+)/, async (msg, match) => {
   const token = match[1]
   const name = msg.from.first_name || 'красотка'
-  await bot.sendMessage(msg.chat.id,
-    `🌸 *Привет, ${name}!*\n\nТебя приглашают дружить в SOFE!\n\nОткрой приложение чтобы принять запрос 💪`,
-    {
-      parse_mode: 'Markdown',
-      reply_markup: { inline_keyboard: [[{
-        text: '✅ Принять приглашение',
-        web_app: { url: `${MINI_APP_URL}?action=accept_friend&token=${token}` }
-      }]] }
+
+  // Auto-accept friendship via API
+  try {
+    // Find who sent the invite
+    const decoded = Buffer.from(token, 'base64url').toString()
+    const [inviterId] = decoded.split(':')
+    const db = require('./db/init')
+    const inviter = db.prepare('SELECT * FROM users WHERE id = ?').get(parseInt(inviterId))
+    const inviterName = inviter?.name || 'пользователь SOFE'
+
+    // Find or create recipient user
+    let recipient = db.prepare('SELECT * FROM users WHERE telegram_id = ?').get(String(msg.from.id))
+
+    if (recipient) {
+      // Auto-accept friendship
+      const existing = db.prepare(`
+        SELECT * FROM friendships
+        WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)
+      `).get(parseInt(inviterId), recipient.id, recipient.id, parseInt(inviterId))
+
+      if (!existing) {
+        db.prepare("INSERT INTO friendships (user_id, friend_id, status) VALUES (?, ?, 'accepted')")
+          .run(parseInt(inviterId), recipient.id)
+      } else if (existing.status !== 'accepted') {
+        db.prepare("UPDATE friendships SET status = 'accepted' WHERE id = ?").run(existing.id)
+      }
+
+      await bot.sendMessage(msg.chat.id,
+        `🌸 *Привет, ${name}!*
+
+✅ Ты и *${inviterName}* теперь подруги в SOFE!
+
+Открой приложение чтобы увидеть подругу на карте и пригласить на тренировку 💪`,
+        {
+          parse_mode: 'Markdown',
+          reply_markup: { inline_keyboard: [[{
+            text: '🌸 Открыть SOFE',
+            web_app: { url: MINI_APP_URL }
+          }]] }
+        }
+      )
+    } else {
+      // User not registered yet - send them to register first
+      await bot.sendMessage(msg.chat.id,
+        `🌸 *Привет, ${name}!*
+
+*${inviterName}* приглашает тебя в SOFE!
+
+Зарегистрируйся в приложении, и вы автоматически станете подругами 👯`,
+        {
+          parse_mode: 'Markdown',
+          reply_markup: { inline_keyboard: [[{
+            text: '✅ Открыть SOFE и принять',
+            web_app: { url: `${MINI_APP_URL}?invite=${token}` }
+          }]] }
+        }
+      )
     }
-  )
+  } catch(e) {
+    console.error('Friend invite error:', e.message)
+    await bot.sendMessage(msg.chat.id,
+      `🌸 Привет, ${name}! Открой SOFE чтобы принять приглашение в друзья!`,
+      { reply_markup: { inline_keyboard: [[{ text: '🌸 Открыть SOFE', web_app: { url: MINI_APP_URL } }]] } }
+    )
+  }
 })
 
 bot.onText(/^\/start$/, async (msg) => {
