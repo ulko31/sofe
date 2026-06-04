@@ -1,33 +1,37 @@
+require('dotenv').config()
 const express = require('express')
 const router = express.Router()
-const db = require('../db/init')
 const auth = require('../middleware/auth')
 
+let db, turso
+try {
+  if (process.env.TURSO_URL) turso = require('../db/turso')
+  else db = require('../db/init')
+} catch(e) { db = require('../db/init') }
+
+async function q(sql, args = []) {
+  if (turso) return turso.query(sql, args)
+  return db.prepare(sql).all(...args)
+}
+async function qOne(sql, args = []) {
+  if (turso) return turso.queryOne(sql, args)
+  return db.prepare(sql).get(...args)
+}
+async function r(sql, args = []) {
+  if (turso) return turso.run(sql, args)
+  return db.prepare(sql).run(...args)
+}
+
 // GET /api/user/me
-router.get('/me', auth, (req, res) => {
+router.get('/me', auth, async (req, res) => {
   res.json({ user: req.user })
 })
 
 // PUT /api/user/profile
-router.put('/profile', auth, (req, res) => {
+router.put('/profile', auth, async (req, res) => {
   const { name, calories, goal, activity, onboarded, telegram_id, age, weight, height, gender } = req.body
-
-  if (telegram_id && !req.user) {
-    const existing = db.prepare('SELECT * FROM users WHERE telegram_id = ?').get(String(telegram_id))
-    if (!existing) {
-      db.prepare('INSERT INTO users (telegram_id, name, calories, goal, activity, onboarded) VALUES (?, ?, ?, ?, ?, ?)')
-        .run(String(telegram_id), name, calories || 2000, goal, activity, onboarded ? 1 : 0)
-    }
-  }
-
-  // Add columns if not exist
-  try { db.exec('ALTER TABLE users ADD COLUMN age INTEGER') } catch(e) {}
-  try { db.exec('ALTER TABLE users ADD COLUMN weight REAL') } catch(e) {}
-  try { db.exec('ALTER TABLE users ADD COLUMN height REAL') } catch(e) {}
-  try { db.exec("ALTER TABLE users ADD COLUMN gender TEXT DEFAULT female") } catch(e) {}
-
-  db.prepare(`
-    UPDATE users SET
+  try {
+    await r(`UPDATE users SET
       name = COALESCE(?, name),
       calories = COALESCE(?, calories),
       goal = COALESCE(?, goal),
@@ -37,44 +41,28 @@ router.put('/profile', auth, (req, res) => {
       weight = COALESCE(?, weight),
       height = COALESCE(?, height),
       gender = COALESCE(?, gender)
-    WHERE id = ?
-  `).run(name || null, calories || null, goal || null, activity || null,
-    onboarded ? 1 : null, age || null, weight || null, height || null,
-    gender || null, req.user.id)
-
-  const updated = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id)
-  res.json({ user: updated })
+      WHERE id = ?`,
+      [name || null, calories || null, goal || null, activity || null,
+       onboarded ? 1 : null, age || null, weight || null, height || null,
+       gender || null, req.user.id])
+    const updated = await qOne('SELECT * FROM users WHERE id = ?', [req.user.id])
+    res.json({ user: updated })
+  } catch(e) { res.status(500).json({ error: e.message }) }
 })
 
-// PUT /api/user/notifications — toggle notifications
-router.put('/notifications', auth, (req, res) => {
+// PUT /api/user/notifications
+router.put('/notifications', auth, async (req, res) => {
   const { notifications_enabled, notify_water, notify_meals, notify_events, notify_morning } = req.body
-
-  // Add columns if they don't exist
-  try { db.exec('ALTER TABLE users ADD COLUMN notifications_enabled INTEGER DEFAULT 1') } catch(e) {}
-  try { db.exec('ALTER TABLE users ADD COLUMN notify_water INTEGER DEFAULT 1') } catch(e) {}
-  try { db.exec('ALTER TABLE users ADD COLUMN notify_meals INTEGER DEFAULT 1') } catch(e) {}
-  try { db.exec('ALTER TABLE users ADD COLUMN notify_events INTEGER DEFAULT 1') } catch(e) {}
-  try { db.exec('ALTER TABLE users ADD COLUMN notify_morning INTEGER DEFAULT 1') } catch(e) {}
-
-  db.prepare(`
-    UPDATE users SET
-      notifications_enabled = ?,
-      notify_water = ?,
-      notify_meals = ?,
-      notify_events = ?,
-      notify_morning = ?
-    WHERE id = ?
-  `).run(
-    notifications_enabled ? 1 : 0,
-    notify_water ? 1 : 0,
-    notify_meals ? 1 : 0,
-    notify_events ? 1 : 0,
-    notify_morning ? 1 : 0,
-    req.user.id
-  )
-
-  res.json({ ok: true })
+  try {
+    await r(`UPDATE users SET
+      notifications_enabled = ?, notify_water = ?,
+      notify_meals = ?, notify_events = ?, notify_morning = ?
+      WHERE id = ?`,
+      [notifications_enabled ? 1 : 0, notify_water ? 1 : 0,
+       notify_meals ? 1 : 0, notify_events ? 1 : 0, notify_morning ? 1 : 0,
+       req.user.id])
+    res.json({ ok: true })
+  } catch(e) { res.status(500).json({ error: e.message }) }
 })
 
 module.exports = router
