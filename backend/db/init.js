@@ -26,6 +26,7 @@ if (!TURSO_URL || !TURSO_TOKEN) {
   // Init schema then export
   initTurso(tursoClient).then(() => {
     console.log('✅ Turso ready')
+  seedRecipes(client).catch(console.error)
   }).catch(e => console.error('Turso init error:', e))
   
   module.exports = db
@@ -95,6 +96,32 @@ function createTursoProxy(client) {
       return (items) => { for (const item of items) fn([item]) }
     }
   }
+}
+
+async function seedRecipes(client) {
+  try {
+    const existing = await client.execute("SELECT COUNT(*) as cnt FROM recipes")
+    if (existing.rows[0][0] > 0) return
+    
+    const recipes = [
+      { name: 'Греческий салат', calories: 100, protein: 3.5, fat: 7.0, carbs: 6.0, time: 10, emoji: '🥗', tags: '["ПП","Лёгкий","Без готовки"]', image_url: 'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=400', ingredients: '[{"name":"Помидоры черри","amount":"200г"},{"name":"Огурец","amount":"1 шт"},{"name":"Перец болгарский","amount":"1 шт"},{"name":"Маслины","amount":"50г"},{"name":"Сыр Фета","amount":"100г"},{"name":"Оливковое масло","amount":"2 ст.л."},{"name":"Орегано","amount":"по вкусу"}]', steps: '[{"step":1,"text":"Нарежь помидоры пополам"},{"step":2,"text":"Огурец и перец нарежь кубиками"},{"step":3,"text":"Добавь маслины и раскроши фету"},{"step":4,"text":"Заправь оливковым маслом и орегано"}]', servings: 2 },
+      { name: 'Овсянка с ягодами', calories: 180, protein: 6.0, fat: 4.0, carbs: 32.0, time: 10, emoji: '🫐', tags: '["Завтрак","ПП","Быстро"]', image_url: 'https://images.unsplash.com/photo-1517673132405-a56a62b18caf?w=400', ingredients: '[{"name":"Овсяные хлопья","amount":"80г"},{"name":"Молоко","amount":"200мл"},{"name":"Черника","amount":"100г"},{"name":"Банан","amount":"1 шт"},{"name":"Мёд","amount":"1 ч.л."}]', steps: '[{"step":1,"text":"Залей хлопья горячим молоком"},{"step":2,"text":"Дай настояться 5 минут"},{"step":3,"text":"Добавь ягоды и нарезанный банан"},{"step":4,"text":"Сбрызни мёдом"}]', servings: 1 },
+      { name: 'Куриная грудка с овощами', calories: 165, protein: 28.0, fat: 4.0, carbs: 8.0, time: 25, emoji: '🍗', tags: '["Обед","Белки","ПП"]', image_url: 'https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?w=400', ingredients: '[{"name":"Куриная грудка","amount":"300г"},{"name":"Брокколи","amount":"200г"},{"name":"Морковь","amount":"1 шт"},{"name":"Оливковое масло","amount":"1 ст.л."},{"name":"Соль, специи","amount":"по вкусу"}]', steps: '[{"step":1,"text":"Нарежь курицу кусочками и замаринуй со специями"},{"step":2,"text":"Обжарь на оливковом масле 7-8 минут"},{"step":3,"text":"Добавь овощи и туши ещё 10 минут"},{"step":4,"text":"Подавай горячим"}]', servings: 2 },
+      { name: 'Смузи-боул', calories: 220, protein: 8.0, fat: 5.0, carbs: 38.0, time: 10, emoji: '🍓', tags: '["Завтрак","Витамины","Красиво"]', image_url: 'https://images.unsplash.com/photo-1511690743698-d9d85f2fbf38?w=400', ingredients: '[{"name":"Замороженная клубника","amount":"150г"},{"name":"Банан","amount":"1 шт"},{"name":"Греческий йогурт","amount":"100г"},{"name":"Гранола","amount":"30г"},{"name":"Свежие ягоды","amount":"50г"},{"name":"Семена чиа","amount":"1 ч.л."}]', steps: '[{"step":1,"text":"Взбей клубнику с бананом и йогуртом"},{"step":2,"text":"Вылей в миску"},{"step":3,"text":"Укрась гранолой, ягодами и семенами чиа"}]', servings: 1 },
+      { name: 'Творожные сырники', calories: 220, protein: 14.0, fat: 8.0, carbs: 22.0, time: 20, emoji: '🧀', tags: '["Завтрак","Белки","Вкусно"]', image_url: 'https://images.unsplash.com/photo-1558961363-fa8fdf82db35?w=400', ingredients: '[{"name":"Творог 5%","amount":"300г"},{"name":"Яйцо","amount":"1 шт"},{"name":"Мука","amount":"3 ст.л."},{"name":"Сахар","amount":"1 ст.л."},{"name":"Ванилин","amount":"щепотка"},{"name":"Сметана","amount":"для подачи"}]', steps: '[{"step":1,"text":"Смешай творог с яйцом, мукой и сахаром"},{"step":2,"text":"Слепи небольшие лепёшки"},{"step":3,"text":"Обжарь на среднем огне по 3-4 минуты с каждой стороны"},{"step":4,"text":"Подавай со сметаной или вареньем"}]', servings: 2 },
+      { name: 'Боул с лососем и рисом', calories: 380, protein: 28.0, fat: 12.0, carbs: 40.0, time: 20, emoji: '🍱', tags: '["Обед","Омега-3","Сытно"]', image_url: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400', ingredients: '[{"name":"Рис","amount":"150г"},{"name":"Лосось","amount":"150г"},{"name":"Авокадо","amount":"0.5 шт"},{"name":"Огурец","amount":"0.5 шт"},{"name":"Соевый соус","amount":"1 ст.л."},{"name":"Кунжут","amount":"1 ч.л."}]', steps: '[{"step":1,"text":"Отвари рис"},{"step":2,"text":"Запеки лосось 12 минут при 180°C"},{"step":3,"text":"Нарежь авокадо и огурец"},{"step":4,"text":"Собери боул: рис + рыба + овощи"},{"step":5,"text":"Полей соевым соусом и посыпь кунжутом"}]', servings: 1 },
+      { name: 'Зелёный детокс-смузи', calories: 95, protein: 3.0, fat: 2.0, carbs: 18.0, time: 5, emoji: '🥤', tags: '["Детокс","Витамины","Быстро"]', image_url: 'https://images.unsplash.com/photo-1610970881699-44a5587cabec?w=400', ingredients: '[{"name":"Шпинат","amount":"50г"},{"name":"Банан","amount":"1 шт"},{"name":"Яблоко","amount":"1 шт"},{"name":"Имбирь","amount":"1 см"},{"name":"Вода или кокосовое молоко","amount":"200мл"}]', steps: '[{"step":1,"text":"Положи все ингредиенты в блендер"},{"step":2,"text":"Взбивай 1-2 минуты до однородности"},{"step":3,"text":"Перелей в стакан и пей сразу"}]', servings: 1 },
+      { name: 'Запечённая рыба с лимоном', calories: 145, protein: 24.0, fat: 5.0, carbs: 2.0, time: 25, emoji: '🐟', tags: '["Ужин","ПП","Белки"]', image_url: 'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?w=400', ingredients: '[{"name":"Белая рыба (треска или тилапия)","amount":"300г"},{"name":"Лимон","amount":"1 шт"},{"name":"Чеснок","amount":"2 зубчика"},{"name":"Оливковое масло","amount":"1 ст.л."},{"name":"Зелень","amount":"по вкусу"}]', steps: '[{"step":1,"text":"Разогрей духовку до 200°C"},{"step":2,"text":"Выложи рыбу на фольгу"},{"step":3,"text":"Полей маслом, добавь чеснок и дольки лимона"},{"step":4,"text":"Запекай 15-18 минут"},{"step":5,"text":"Посыпь зеленью и подавай"}]', servings: 2 }
+    ]
+    
+    for (const r of recipes) {
+      await client.execute({
+        sql: 'INSERT INTO recipes (name, calories, protein, fat, carbs, time, emoji, tags, image_url, ingredients, steps, servings) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
+        args: [r.name, r.calories, r.protein, r.fat, r.carbs, r.time, r.emoji, r.tags, r.image_url, r.ingredients, r.steps, r.servings]
+      })
+    }
+    console.log('✅ Seeded', recipes.length, 'recipes')
+  } catch(e) { console.error('Recipe seed error:', e.message) }
 }
 
 async function initTurso(client) {
