@@ -91,7 +91,7 @@ export default function Nutrition() {
         <div style={{ display: 'flex', gap: 8, overflowX: 'auto', margin: '0 -16px', padding: '0 16px 10px' }}>
           {allTags.map(tag => (
             <button key={tag} onClick={() => { haptic('light'); setActiveTag(tag) }}
-              style={{ flexShrink: 0, padding: '6px 14px', borderRadius: 20, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Nunito, sans-serif', border: 'none', background: activeTag === tag ? 'var(--pink)' : 'var(--white)', color: activeTag === tag ? 'white' : 'var(--text-muted)', border: activeTag === tag ? 'none' : '1.5px solid var(--border)' }}>
+              style={{ flexShrink: 0, padding: '6px 14px', borderRadius: 20, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Nunito, sans-serif', background: activeTag === tag ? 'var(--pink)' : 'var(--white)', color: activeTag === tag ? 'white' : 'var(--text-muted)', border: activeTag === tag ? 'none' : '1.5px solid var(--border)' }}>
               {tag}
             </button>
           ))}
