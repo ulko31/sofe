@@ -144,7 +144,20 @@ export default function MapScreen({ user }) {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--bg)', position: 'relative' }}>
       {/* Header */}
       <div style={{ padding: '48px 16px 12px', background: 'var(--white)', borderBottom: '0.5px solid var(--border)', flexShrink: 0 }}>
-        <h2 style={{ fontSize: 20, fontWeight: 900, marginBottom: 10 }}>Карта</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 900 }}>Карта</h2>
+        <button onClick={() => {
+          navigator.geolocation?.getCurrentPosition(
+            pos => {
+              setUserLocation([pos.coords.latitude, pos.coords.longitude])
+              if (mapInstanceRef.current) mapInstanceRef.current.setCenter([pos.coords.latitude, pos.coords.longitude], 14)
+            },
+            () => alert('Разреши геолокацию в настройках Telegram')
+          )
+        }} style={{ background: 'var(--pink-light)', border: 'none', borderRadius: 20, padding: '6px 12px', color: 'var(--pink)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Nunito, sans-serif' }}>
+          📍 Моя позиция
+        </button>
+      </div>
         <div style={{ display: 'flex', gap: 8, overflowX: 'auto' }}>
           {CATEGORIES.map(cat => (
             <button key={cat.id} onClick={() => { haptic('light'); setCategory(cat.id); setSelected(null) }}
@@ -176,7 +189,7 @@ export default function MapScreen({ user }) {
 
       {/* Places cards - horizontal scroll */}
       {!selected && (
-        <div style={{ background: 'var(--white)', borderTop: '0.5px solid var(--border)', flexShrink: 0, paddingBottom: 80 }}>
+        <div style={{ background: 'var(--white)', borderTop: '0.5px solid var(--border)', flexShrink: 0, paddingBottom: 100 }}>
           {loading ? (
             <div style={{ padding: '12px 16px', color: 'var(--text-muted)', fontSize: 13 }}>Загрузка...</div>
           ) : filtered.length === 0 ? (
