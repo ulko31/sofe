@@ -30,12 +30,22 @@ export default function Profile({ user, tgUser, onTabChange, onOpenAI }) {
     haptic('medium')
     setSaving(true)
     try {
-      await updateProfile(form)
+      await updateProfile({
+        ...form,
+        calories: parseInt(form.calories) || 2000,
+        age: form.age ? parseInt(form.age) : null,
+        weight: form.weight ? parseFloat(form.weight) : null,
+        height: form.height ? parseFloat(form.height) : null,
+      })
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
       setEditing(false)
-    } catch(e) {}
-    finally { setSaving(false) }
+    } catch(e) {
+      console.error('Save error:', e)
+      alert('Ошибка сохранения: ' + (e.response?.data?.error || e.message))
+    } finally {
+      setSaving(false)
+    }
   }
 
   const goalLabel = {
