@@ -214,6 +214,16 @@ export default function Home({ user, onOpenAI, onTabChange }) {
 
       {/* Trackers */}
       <div>
+        {/* AI Assistant quick access */}
+        <div onClick={() => onOpenAI?.()} style={{ background: 'linear-gradient(135deg, var(--pink), #c2305e)', borderRadius: 'var(--radius)', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', marginBottom: 4 }}>
+          <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>🤖</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ color: 'white', fontWeight: 800, fontSize: 14 }}>SOFE ИИ-ассистент</div>
+            <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 2 }}>Спроси про питание или тренировки</div>
+          </div>
+          <i className="ti ti-chevron-right" style={{ color: 'rgba(255,255,255,0.6)', fontSize: 18 }} />
+        </div>
+
         <div className="section-header"><h3>Трекеры</h3></div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           {[
@@ -469,6 +479,43 @@ export default function Home({ user, onOpenAI, onTabChange }) {
           </div>
         </div>
       )}
+        {/* Recipes quick access */}
+        <div className="section-header">
+          <h3>Рецепты</h3>
+          <a onClick={() => { onTabChange?.('nutrition') }} style={{ cursor: 'pointer' }}>Все →</a>
+        </div>
+        <RecipesPreview />
+
+    </div>
+  )
+}
+
+function RecipesPreview() {
+  const { haptic } = useTelegram()
+  const [recipes, setRecipes] = useState([])
+
+  useEffect(() => {
+    fetch(import.meta.env.VITE_API_URL + '/recipes')
+      .then(r => r.json())
+      .then(data => setRecipes(Array.isArray(data) ? data.slice(0, 4) : []))
+      .catch(() => {})
+  }, [])
+
+  if (recipes.length === 0) return (
+    <div style={{ background: 'var(--white)', borderRadius: 'var(--radius)', padding: '14px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13, border: '0.5px solid var(--border)' }}>
+      Рецепты появятся здесь 🍽
+    </div>
+  )
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+      {recipes.map(r => (
+        <div key={r.id} className="card" style={{ cursor: 'pointer', padding: 14 }} onClick={() => haptic('light')}>
+          <div style={{ fontSize: 28, marginBottom: 6 }}>{r.emoji || '🍽'}</div>
+          <div style={{ fontSize: 13, fontWeight: 800, lineHeight: 1.3 }}>{r.name}</div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>{r.calories} ккал · {r.time} мин</div>
+        </div>
+      ))}
     </div>
   )
 }
