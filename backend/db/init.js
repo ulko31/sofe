@@ -106,14 +106,14 @@ async function seedRecipes(client) {
     if (count > 0) {
       // Just update images for existing recipes
       const imageUpdates = [
-        { name: 'Греческий салат', url: 'https://images.unsplash.com/photo-1473093295043-cdd812d0e601?w=400' },
-        { name: 'Овсянка с ягодами', url: 'https://images.unsplash.com/photo-1495214783159-3503fd1b572d?w=400' },
-        { name: 'Куриная грудка с овощами', url: 'https://images.unsplash.com/photo-1532550907401-a500c9a57435?w=400' },
-        { name: 'Смузи-боул', url: 'https://images.unsplash.com/photo-1490323814667-3b4f87c6d9d6?w=400' },
-        { name: 'Творожные сырники', url: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400' },
-        { name: 'Боул с лососем и рисом', url: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=400' },
-        { name: 'Зелёный детокс-смузи', url: 'https://images.unsplash.com/photo-1622597467836-f3285f2131b8?w=400' },
-        { name: 'Запечённая рыба с лимоном', url: 'https://images.unsplash.com/photo-1467003909585-2f8a72700288?w=400' }
+        { name: 'Греческий салат', url: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&fit=crop' },
+        { name: 'Овсянка с ягодами', url: 'https://images.unsplash.com/photo-1517673132405-a56a62b18caf?w=400&fit=crop' },
+        { name: 'Куриная грудка с овощами', url: 'https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?w=400&fit=crop' },
+        { name: 'Смузи-боул', url: 'https://images.unsplash.com/photo-1590301157890-4810ed352733?w=400&fit=crop' },
+        { name: 'Творожные сырники', url: 'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=400&fit=crop' },
+        { name: 'Боул с лососем и рисом', url: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&fit=crop' },
+        { name: 'Зелёный детокс-смузи', url: 'https://images.unsplash.com/photo-1638176066959-4f6a4ee8f7b6?w=400&fit=crop' },
+        { name: 'Запечённая рыба с лимоном', url: 'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?w=400&fit=crop' }
       ]
       for (const { name, url } of imageUpdates) {
         await client.execute({ sql: 'UPDATE recipes SET image_url = ? WHERE name = ?', args: [url, name] })
