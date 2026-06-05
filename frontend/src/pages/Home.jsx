@@ -182,6 +182,14 @@ export default function Home({ user, onOpenAI, onTabChange }) {
     await updateTracker('water', newVal).catch(() => {})
   }
 
+  const handleWaterRemove = async (e) => {
+    e?.stopPropagation()
+    haptic('light')
+    const newVal = Math.max(0, +(trackers.water || 0) - 0.25)
+    setTrackers(t => ({ ...t, water: newVal }))
+    await updateTracker('water', newVal).catch(() => {})
+  }
+
   const remaining = Math.max(0, (stats.goal || 2000) - (stats.consumed || 0))
   const progress = Math.min(100, ((stats.consumed || 0) / (stats.goal || 2000)) * 100)
 
