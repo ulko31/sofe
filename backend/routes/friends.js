@@ -101,6 +101,13 @@ router.delete('/:id', auth, async (req, res) => {
   res.json({ ok: true })
 })
 
+router.get('/my-location', auth, async (req, res) => {
+  try {
+    const loc = await qOne('SELECT * FROM user_locations WHERE user_id = ?', [req.user.id])
+    res.json(loc || { share_location: 0 })
+  } catch(e) { res.json({ share_location: 0 }) }
+})
+
 router.post('/location', auth, async (req, res) => {
   const { lat, lng, share } = req.body
   await exec(`CREATE TABLE IF NOT EXISTS user_locations (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL UNIQUE, lat REAL, lng REAL, share_location INTEGER DEFAULT 0, updated_at TEXT DEFAULT (datetime('now')))`)
