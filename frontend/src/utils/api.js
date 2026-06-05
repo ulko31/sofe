@@ -4,16 +4,35 @@ const BASE_URL = import.meta.env.VITE_API_URL || '/api'
 
 const api = axios.create({
   baseURL: BASE_URL,
-  timeout: 10000
+  timeout: 15000
 })
 
 api.interceptors.request.use(config => {
   const tg = window.Telegram?.WebApp
-  if (tg?.initData) {
-    config.headers['X-Telegram-Init-Data'] = tg.initData
+  const initData = tg?.initData || ''
+  if (initData) {
+    config.headers['X-Telegram-Init-Data'] = initData
   }
   return config
 })
+
+// Retry on 401 after short delay (Telegram may not be ready yet)
+api.interceptors.response.use(
+  res => res,
+  async err => {
+    if (err.response?.status === 401 && !err.config._retry) {
+      err.config._retry = true
+      await new Promise(r => setTimeout(r, 1000))
+      const tg = window.Telegram?.WebApp
+      const initData = tg?.initData || ''
+      if (initData) {
+        err.config.headers['X-Telegram-Init-Data'] = initData
+      }
+      return api(err.config)
+    }
+    return Promise.reject(err)
+  }
+)
 
 export default api
 
@@ -35,7 +54,5 @@ export const getMyWorkouts = () => api.get('/workouts/my')
 export const addWorkout = (data) => api.post('/workouts/my', data)
 
 export const getSubscriptions = () => api.get('/subscriptions')
-export const addSubscription = (data) => api.post('/subscriptions', data)
-
 export const getRecipes = () => api.get('/recipes')
 export const getProgress = () => api.get('/progress')
