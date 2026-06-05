@@ -100,9 +100,26 @@ function createTursoProxy(client) {
 
 async function seedRecipes(client) {
   try {
-    // Allow re-seeding if count is 0
+    // Update images even if recipes exist
     const existing = await client.execute("SELECT COUNT(*) as cnt FROM recipes")
-    if (Number(existing.rows[0][0]) > 0) return
+    const count = Number(existing.rows[0][0])
+    if (count > 0) {
+      // Just update images for existing recipes
+      const imageUpdates = [
+        { name: 'Греческий салат', url: 'https://images.unsplash.com/photo-1473093295043-cdd812d0e601?w=400' },
+        { name: 'Овсянка с ягодами', url: 'https://images.unsplash.com/photo-1495214783159-3503fd1b572d?w=400' },
+        { name: 'Куриная грудка с овощами', url: 'https://images.unsplash.com/photo-1532550907401-a500c9a57435?w=400' },
+        { name: 'Смузи-боул', url: 'https://images.unsplash.com/photo-1490323814667-3b4f87c6d9d6?w=400' },
+        { name: 'Творожные сырники', url: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400' },
+        { name: 'Боул с лососем и рисом', url: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=400' },
+        { name: 'Зелёный детокс-смузи', url: 'https://images.unsplash.com/photo-1622597467836-f3285f2131b8?w=400' },
+        { name: 'Запечённая рыба с лимоном', url: 'https://images.unsplash.com/photo-1467003909585-2f8a72700288?w=400' }
+      ]
+      for (const { name, url } of imageUpdates) {
+        await client.execute({ sql: 'UPDATE recipes SET image_url = ? WHERE name = ?', args: [url, name] })
+      }
+      return
+    }
     
     const recipes = [
       { name: 'Греческий салат', calories: 100, protein: 3.5, fat: 7.0, carbs: 6.0, time: 10, emoji: '🥗', tags: '["ПП","Лёгкий","Без готовки"]', image_url: 'https://images.unsplash.com/photo-1473093295043-cdd812d0e601?w=400', ingredients: '[{"name":"Помидоры черри","amount":"200г"},{"name":"Огурец","amount":"1 шт"},{"name":"Перец болгарский","amount":"1 шт"},{"name":"Маслины","amount":"50г"},{"name":"Сыр Фета","amount":"100г"},{"name":"Оливковое масло","amount":"2 ст.л."},{"name":"Орегано","amount":"по вкусу"}]', steps: '[{"step":1,"text":"Нарежь помидоры пополам"},{"step":2,"text":"Огурец и перец нарежь кубиками"},{"step":3,"text":"Добавь маслины и раскроши фету"},{"step":4,"text":"Заправь оливковым маслом и орегано"}]', servings: 2 },
