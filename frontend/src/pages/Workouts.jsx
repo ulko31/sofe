@@ -1,18 +1,9 @@
 import { useState, useEffect } from 'react'
-import { getWorkouts, getSubscriptions, addWorkout } from '../utils/api'
 import { useTelegram } from '../hooks/useTelegram'
+import api from '../utils/api'
 
 const filters = ['Все', 'FIT', 'Stretching', 'Fit ball', 'Йога', 'Пилатес']
 const workoutEmoji = { FIT: '🏃‍♀️', Stretching: '🧘‍♀️', 'Fit ball': '⚽', Йога: '🪷', Пилатес: '🎯' }
-
-function getVideoEmbedUrl(url) {
-  if (!url) return null
-  const driveId = extractDriveId(url)
-  if (driveId) return `https://drive.google.com/file/d/${driveId}/preview`
-  const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]+)/)
-  if (ytMatch) return `https://www.youtube.com/embed/${ytMatch[1]}?rel=0&showinfo=0`
-  return url
-}
 
 function extractDriveId(url) {
   if (!url) return null
@@ -24,42 +15,57 @@ function extractDriveId(url) {
 }
 
 function getDriveThumbnail(url) {
+  if (!url) return null
   const id = extractDriveId(url)
   if (id) return `https://drive.google.com/thumbnail?id=${id}&sz=w400`
   return url
 }
 
-export default function Workouts() {
+function getVideoEmbedUrl(url) {
+  if (!url) return null
+  const id = extractDriveId(url)
+  if (id) return `https://drive.google.com/file/d/${id}/preview`
+  const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]+)/)
+  if (ytMatch) return `https://www.youtube.com/embed/${ytMatch[1]}?rel=0`
+  return url
+}
+
+export default function Workouts({ user, onTabChange, onBack }) {
   const { haptic } = useTelegram()
   const [filter, setFilter] = useState('Все')
   const [workouts, setWorkouts] = useState([])
-  const [subs, setSubs] = useState([])
-  const [showAddGym, setShowAddGym] = useState(false)
-  const [newGymName, setNewGymName] = useState('')
-  const [newGymSessions, setNewGymSessions] = useState('8')
+  const [gyms, setGyms] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedWorkout, setSelectedWorkout] = useState(null)
   const [showVideo, setShowVideo] = useState(false)
+  const [showAddGym, setShowAddGym] = useState(false)
+  const [newGymName, setNewGymName] = useState('')
+  const [newGymSessions, setNewGymSessions] = useState('8')
 
   useEffect(() => {
-    Promise.all([getWorkouts(), getSubscriptions()])
-      .then(([w, s]) => {
-        setWorkouts(w.data)
-        setSubs(s.data)
-      })
-      .catch(() => {
-        setWorkouts([])
-        setSubs([])
-      })
-      .finally(() => setLoading(false))
+    Promise.all([
+      api.get('/workouts').catch(() => ({ data: [] })),
+      api.get('/workouts/gyms').catch(() => ({ data: [] }))
+    ]).then(([w, g]) => {
+      setWorkouts(Array.isArray(w.data) ? w.data : [])
+      setGyms(Array.isArray(g.data) ? g.data : [])
+    }).finally(() => setLoading(false))
   }, [])
+
+  const filtered = filter === 'Все' ? workouts : workouts.filter(w => w.type === filter)
+
+  const handleStart = (workout) => {
+    haptic('medium')
+    setSelectedWorkout(workout)
+    if (workout.video_url) setShowVideo(true)
+  }
 
   const handleAddGym = async () => {
     if (!newGymName.trim()) return
     haptic('medium')
     try {
       const res = await api.post('/workouts/gyms', { name: newGymName, total_sessions: parseInt(newGymSessions) || 8 })
-      setSubs(s => [...s, res.data])
+      setGyms(g => [...g, res.data])
       setNewGymName('')
       setNewGymSessions('8')
       setShowAddGym(false)
@@ -68,160 +74,151 @@ export default function Workouts() {
 
   const handleMarkVisit = async (gym) => {
     haptic('light')
-    if (gym.used_sessions >= gym.total_sessions) { alert('Все занятия использованы!'); return }
+    if ((gym.used_sessions || 0) >= gym.total_sessions) {
+      alert('Все занятия использованы!')
+      return
+    }
     try {
       const res = await api.put(`/workouts/gyms/${gym.id}`, { used_sessions: (gym.used_sessions || 0) + 1 })
-      setSubs(s => s.map(g => g.id === gym.id ? res.data : g))
+      setGyms(g => g.map(x => x.id === gym.id ? res.data : x))
     } catch(e) {}
   }
 
   const handleDeleteGym = async (gymId) => {
     if (!confirm('Удалить зал?')) return
-    haptic('light')
     try {
       await api.delete(`/workouts/gyms/${gymId}`)
-      setSubs(s => s.filter(g => g.id !== gymId))
+      setGyms(g => g.filter(x => x.id !== gymId))
     } catch(e) {}
   }
 
-  const handleLogWorkout = async (workout) => {
-    haptic('medium')
-    try {
-      await api.post('/workouts/log', { workout_id: workout.id, date: new Date().toISOString().split('T')[0] })
-    } catch(e) {}
-  }
-
-  const filtered = filter === 'Все' ? workouts : workouts.filter(w => w.type === filter)
-
-  const handleStart = (workout) => {
-    haptic('medium')
-    setSelectedWorkout(workout)
-    if (workout.video_url) {
-      setShowVideo(true)
-    }
-  }
-
-  if (loading) return <div className="screen" style={{ alignItems: 'center', justifyContent: 'center' }}><div className="spinner" /></div>
+  if (loading) return (
+    <div className="screen" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+      <div className="spinner" />
+    </div>
+  )
 
   return (
     <div className="screen">
+      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        {onBack && <button onClick={onBack} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: 'var(--text)', padding: '0 4px' }}>←</button>}
+        {onBack && (
+          <button onClick={onBack} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: 'var(--text)', padding: 0 }}>←</button>
+        )}
         <h2 style={{ fontSize: 20, fontWeight: 900 }}>Тренировки</h2>
       </div>
 
       {/* Filters */}
-      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', margin: '0 -16px', padding: '0 16px' }}>
+      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', margin: '0 -16px', padding: '0 16px 4px' }}>
         {filters.map(f => (
           <button key={f} onClick={() => { haptic('light'); setFilter(f) }}
-            style={{ padding: '7px 16px', borderRadius: 20, fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0, cursor: 'pointer', transition: 'all 0.15s', border: filter === f ? 'none' : '1.5px solid var(--border)', background: filter === f ? 'var(--pink)' : 'var(--white)', color: filter === f ? 'white' : 'var(--text-muted)', fontFamily: 'Nunito, sans-serif' }}>
+            style={{ flexShrink: 0, padding: '7px 16px', borderRadius: 20, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Nunito, sans-serif', border: 'none', background: filter === f ? 'var(--pink)' : 'var(--white)', color: filter === f ? 'white' : 'var(--text-muted)', transition: 'all 0.15s' }}>
             {f}
           </button>
         ))}
       </div>
 
       {/* Workout list */}
-      <div>
-        <div className="section-header"><h3>Библиотека тренировок</h3></div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {filtered.map(w => (
-            <div key={w.id} className="card"
-              style={{ display: 'flex', padding: 0, overflow: 'hidden', cursor: 'pointer', border: selectedWorkout?.id === w.id ? '2px solid var(--pink)' : '0.5px solid var(--border)' }}
-              onClick={() => handleStart(w)}>
-              {/* Thumbnail or emoji */}
-              <div style={{ width: 90, flexShrink: 0, background: w.type === 'Stretching' || w.type === 'Йога' ? 'var(--green-light)' : 'var(--pink-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
-                {w.thumbnail_url ? (
-                  <img src={getDriveThumbnail(w.thumbnail_url)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => e.target.style.display='none'} />
-                ) : (
-                  <span style={{ fontSize: 32 }}>{workoutEmoji[w.type] || '💪'}</span>
-                )}
-                {w.video_url && (
-                  <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,255,255,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <i className="ti ti-player-play-filled" style={{ fontSize: 14, color: 'var(--pink)', marginLeft: 2 }} />
-                    </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {filtered.length === 0 && (
+          <div style={{ textAlign: 'center', padding: 32, color: 'var(--text-muted)', fontSize: 13 }}>
+            <div style={{ fontSize: 40, marginBottom: 8 }}>💪</div>
+            Тренировки появятся после добавления в Панели администратора
+          </div>
+        )}
+        {filtered.map(w => (
+          <div key={w.id} className="card" style={{ display: 'flex', gap: 0, overflow: 'hidden', cursor: 'pointer', padding: 0 }}
+            onClick={() => handleStart(w)}>
+            <div style={{ width: 90, minHeight: 90, flexShrink: 0, background: w.type === 'Stretching' || w.type === 'Йога' ? 'var(--green-light)' : 'var(--pink-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
+              {w.thumbnail_url ? (
+                <img src={getDriveThumbnail(w.thumbnail_url)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.target.style.display = 'none' }} />
+              ) : (
+                <span style={{ fontSize: 32 }}>{workoutEmoji[w.type] || '💪'}</span>
+              )}
+              {w.video_url && (
+                <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(255,255,255,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <i className="ti ti-player-play-filled" style={{ fontSize: 14, color: 'var(--pink)', marginLeft: 2 }} />
                   </div>
-                )}
-              </div>
-              <div style={{ padding: 14, flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 800 }}>{w.name}</div>
-                {w.instructor && <div style={{ fontSize: 11, color: 'var(--pink)', fontWeight: 600, marginTop: 2 }}>👩‍🏫 {w.instructor}</div>}
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>{w.duration} мин · {w.format}</div>
-                <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-                  <span className="badge badge-pink">{w.level}</span>
-                  {w.video_url && <span className="badge badge-green">▶ Видео</span>}
                 </div>
-              </div>
+              )}
             </div>
-          ))}
-          {filtered.length === 0 && (
-            <div style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)', fontSize: 13 }}>Нет тренировок в этой категории</div>
-          )}
-        </div>
-      </div>
-
-      {/* Subscriptions */}
-      <div>
-        <div className="section-header">
-          <h3>Мои залы и студии</h3>
-          <a onClick={() => setShowAddGym(true)} style={{ cursor: 'pointer' }}>+ Добавить</a>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-          {subs.map(s => {
-            const remaining = s.total - s.used
-            return (
-              <div key={s.id} className="card" style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 14, fontWeight: 900, color: 'var(--pink)' }}>{s.studio}</div>
-                <div style={{ fontSize: 20, fontWeight: 900, margin: '6px 0 2px' }}>{remaining}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>из {s.total} занятий</div>
-                <div style={{ height: 4, background: '#f0f0f0', borderRadius: 2, marginTop: 8 }}>
-                  <div style={{ height: '100%', background: 'var(--pink)', borderRadius: 2, width: `${(s.used / s.total) * 100}%` }} />
-                </div>
+            <div style={{ padding: 14, flex: 1 }}>
+              <div style={{ fontSize: 14, fontWeight: 800 }}>{w.name}</div>
+              {w.instructor && <div style={{ fontSize: 11, color: 'var(--pink)', fontWeight: 600, marginTop: 2 }}>👩‍🏫 {w.instructor}</div>}
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>{w.duration} мин · {w.format}</div>
+              <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                <span className="badge badge-pink">{w.level}</span>
+                {w.video_url && <span className="badge badge-green">▶ Видео</span>}
               </div>
-            )
-          })}
-          <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1.5px dashed var(--border)', cursor: 'pointer', minHeight: 80 }} onClick={() => haptic('light')}>
-            <div style={{ textAlign: 'center', color: 'var(--pink)' }}>
-              <i className="ti ti-plus" style={{ fontSize: 20 }} />
-              <div style={{ fontSize: 11, fontWeight: 700, marginTop: 4 }}>Добавить</div>
             </div>
           </div>
-        </div>
+        ))}
       </div>
 
-      {/* Video modal */}
-      {showVideo && selectedWorkout?.video_url && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', zIndex: 300, display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', paddingTop: 'max(16px, env(safe-area-inset-top))' }}>
-            <div>
-              <div style={{ color: 'white', fontWeight: 800, fontSize: 16 }}>{selectedWorkout.name}</div>
-              <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>{selectedWorkout.duration} мин · {selectedWorkout.level}</div>
+      {/* Gyms section */}
+      <div className="section-header">
+        <h3>Мои залы и студии</h3>
+        <a onClick={() => setShowAddGym(true)} style={{ cursor: 'pointer' }}>+ Добавить</a>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {gyms.length === 0 && !showAddGym && (
+          <div style={{ textAlign: 'center', padding: 16, color: 'var(--text-muted)', fontSize: 13, background: 'var(--white)', borderRadius: 'var(--radius)', border: '0.5px solid var(--border)' }}>
+            Добавь свой зал или студию чтобы отслеживать абонемент
+          </div>
+        )}
+
+        {gyms.map(g => (
+          <div key={g.id} className="card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <div style={{ fontSize: 14, fontWeight: 900, color: 'var(--pink)' }}>{g.name}</div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{g.used_sessions || 0}/{g.total_sessions} занятий</div>
+                <button onClick={() => handleDeleteGym(g.id)} style={{ background: 'none', border: 'none', color: '#ccc', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>×</button>
+              </div>
             </div>
-            <button onClick={() => { setShowVideo(false); haptic('light') }}
-              style={{ color: 'white', fontSize: 24, background: 'none', border: 'none', cursor: 'pointer', padding: 8 }}>
-              <i className="ti ti-x" />
+            <div style={{ background: 'var(--bg)', borderRadius: 8, height: 8, overflow: 'hidden', marginBottom: 10 }}>
+              <div style={{ background: 'var(--pink)', height: '100%', borderRadius: 8, width: `${Math.min(100, ((g.used_sessions||0)/g.total_sessions)*100)}%`, transition: 'width 0.3s' }} />
+            </div>
+            <button onClick={() => handleMarkVisit(g)}
+              style={{ width: '100%', padding: 8, borderRadius: 10, background: (g.used_sessions||0) >= g.total_sessions ? '#eee' : 'var(--pink-light)', border: 'none', color: (g.used_sessions||0) >= g.total_sessions ? '#999' : 'var(--pink)', fontWeight: 700, cursor: 'pointer', fontFamily: 'Nunito, sans-serif', fontSize: 13 }}>
+              ✅ Отметить занятие
             </button>
           </div>
+        ))}
 
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 0 32px' }}>
+        {showAddGym && (
+          <div className="card">
+            <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 12 }}>Новый зал / студия</div>
+            <input placeholder="Название (ELASTICA, FitnessPark...)" value={newGymName}
+              onChange={e => setNewGymName(e.target.value)} style={{ marginBottom: 10 }} autoFocus />
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
+              <span style={{ fontSize: 13, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Занятий в абонементе:</span>
+              <input type="number" value={newGymSessions} onChange={e => setNewGymSessions(e.target.value)} style={{ width: 70 }} />
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button className="btn-primary" style={{ flex: 1 }} onClick={handleAddGym}>Добавить</button>
+              <button className="btn-outline" style={{ flex: 1 }} onClick={() => setShowAddGym(false)}>Отмена</button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Video player modal */}
+      {showVideo && selectedWorkout?.video_url && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 100, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '48px 16px 12px' }}>
+            <div style={{ color: 'white', fontWeight: 800, fontSize: 16 }}>{selectedWorkout.name}</div>
+            <button onClick={() => setShowVideo(false)} style={{ color: 'white', fontSize: 28, background: 'none', border: 'none', cursor: 'pointer', lineHeight: 1 }}>×</button>
+          </div>
+          <div style={{ flex: 1, padding: '0 0 32px' }}>
             <iframe
               src={getVideoEmbedUrl(selectedWorkout.video_url)}
-              style={{ width: '100%', height: 'min(56vw, 400px)', border: 'none', borderRadius: 12 }}
+              style={{ width: '100%', height: '100%', border: 'none' }}
               allow="autoplay; fullscreen"
               allowFullScreen
             />
-          </div>
-
-          <div style={{ padding: '0 20px 40px' }}>
-            <button className="btn-primary" onClick={async () => {
-              haptic('medium')
-              try {
-                await addWorkout({ workout_id: selectedWorkout.id, date: new Date().toISOString().split('T')[0] })
-              } catch(e) {}
-              setShowVideo(false)
-            }}>
-              ✅ Отметить как выполненную
-            </button>
           </div>
         </div>
       )}
