@@ -110,7 +110,38 @@ export const COMMON_FOODS = [
   { id: 'mt5', name: 'Куриные наггетсы', calories: 250, protein: 15.0, fat: 14.0, carbs: 15.0, unit: '100г', unit_weight: 100 },
   { id: 'mt6', name: 'Тефтели', calories: 194, protein: 13.3, fat: 11.6, carbs: 8.7, unit: '2 шт', unit_weight: 120 },
 
-  // Фрукты и ягоды
+  // Фрукты и ягоды (расширенный список)
+  { id: 'kw1', name: 'Киви', calories: 61, protein: 1.1, fat: 0.5, carbs: 14.7, unit: '1 шт', unit_weight: 75 },
+  { id: 'kw2', name: 'Ананас', calories: 50, protein: 0.5, fat: 0.1, carbs: 13.1, unit: '100г', unit_weight: 100 },
+  { id: 'kw3', name: 'Гранат', calories: 83, protein: 1.7, fat: 1.2, carbs: 18.7, unit: '100г', unit_weight: 100 },
+  { id: 'kw4', name: 'Лимон', calories: 34, protein: 1.3, fat: 0.3, carbs: 9.0, unit: '1 шт', unit_weight: 80 },
+  { id: 'kw5', name: 'Мандарин', calories: 38, protein: 0.8, fat: 0.2, carbs: 7.5, unit: '1 шт', unit_weight: 80 },
+  { id: 'kw6', name: 'Малина', calories: 46, protein: 0.8, fat: 0.5, carbs: 11.9, unit: '100г', unit_weight: 100 },
+  { id: 'kw7', name: 'Черника', calories: 57, protein: 0.7, fat: 0.3, carbs: 14.5, unit: '100г', unit_weight: 100 },
+  { id: 'kw8', name: 'Вишня', calories: 52, protein: 0.8, fat: 0.5, carbs: 12.2, unit: '100г', unit_weight: 100 },
+  { id: 'kw9', name: 'Абрикос', calories: 44, protein: 0.9, fat: 0.1, carbs: 10.8, unit: '2 шт', unit_weight: 80 },
+  { id: 'kw10', name: 'Смородина', calories: 44, protein: 1.0, fat: 0.4, carbs: 11.5, unit: '100г', unit_weight: 100 },
+  { id: 'kw11', name: 'Финики', calories: 282, protein: 2.5, fat: 0.4, carbs: 75.0, unit: '5 шт', unit_weight: 50 },
+  { id: 'kw12', name: 'Инжир', calories: 74, protein: 0.7, fat: 0.2, carbs: 19.2, unit: '1 шт', unit_weight: 50 },
+  // Овощи расширенные
+  { id: 'vg1', name: 'Тыква', calories: 26, protein: 1.0, fat: 0.1, carbs: 6.5, unit: '100г', unit_weight: 100 },
+  { id: 'vg2', name: 'Кабачок', calories: 24, protein: 0.6, fat: 0.3, carbs: 5.2, unit: '100г', unit_weight: 100 },
+  { id: 'vg3', name: 'Баклажан', calories: 25, protein: 1.2, fat: 0.1, carbs: 5.9, unit: '100г', unit_weight: 100 },
+  { id: 'vg4', name: 'Лук репчатый', calories: 41, protein: 1.4, fat: 0.2, carbs: 10.4, unit: '100г', unit_weight: 100 },
+  { id: 'vg5', name: 'Шпинат', calories: 23, protein: 2.9, fat: 0.4, carbs: 3.6, unit: '100г', unit_weight: 100 },
+  { id: 'vg6', name: 'Шампиньоны', calories: 27, protein: 4.3, fat: 1.0, carbs: 1.0, unit: '100г', unit_weight: 100 },
+  { id: 'vg7', name: 'Цветная капуста', calories: 30, protein: 2.5, fat: 0.3, carbs: 5.4, unit: '100г', unit_weight: 100 },
+  { id: 'vg8', name: 'Кукуруза варёная', calories: 123, protein: 4.1, fat: 2.3, carbs: 22.5, unit: '100г', unit_weight: 100 },
+  { id: 'vg9', name: 'Горошек зелёный', calories: 73, protein: 5.0, fat: 0.2, carbs: 13.8, unit: '100г', unit_weight: 100 },
+  { id: 'vg10', name: 'Чеснок', calories: 149, protein: 6.4, fat: 0.5, carbs: 29.9, unit: '1 зубчик', unit_weight: 5 },
+  // Орехи и семена
+  { id: 'nt1', name: 'Кешью', calories: 553, protein: 18.2, fat: 43.8, carbs: 30.2, unit: '30г', unit_weight: 30 },
+  { id: 'nt2', name: 'Фундук', calories: 628, protein: 15.0, fat: 61.5, carbs: 17.0, unit: '30г', unit_weight: 30 },
+  { id: 'nt3', name: 'Фисташки', calories: 562, protein: 20.6, fat: 45.4, carbs: 27.2, unit: '30г', unit_weight: 30 },
+  { id: 'nt4', name: 'Семена чиа', calories: 486, protein: 16.5, fat: 30.7, carbs: 42.1, unit: '1 ст.л.', unit_weight: 15 },
+  { id: 'nt5', name: 'Семена льна', calories: 534, protein: 18.3, fat: 42.2, carbs: 28.9, unit: '1 ст.л.', unit_weight: 10 },
+
+  // Фрукты и ягоды (оригинальные)
   { id: 'fr1', name: 'Груша', calories: 42, protein: 0.4, fat: 0.3, carbs: 10.9, unit: '1 шт', unit_weight: 160 },
   { id: 'fr2', name: 'Персик', calories: 46, protein: 0.9, fat: 0.1, carbs: 11.3, unit: '1 шт', unit_weight: 130 },
   { id: 'fr3', name: 'Арбуз', calories: 38, protein: 0.7, fat: 0.2, carbs: 9.2, unit: '100г', unit_weight: 100 },
