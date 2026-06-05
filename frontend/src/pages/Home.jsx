@@ -41,13 +41,16 @@ export default function Home({ user, onOpenAI, onTabChange }) {
   useEffect(() => {
     if (!user) return
     loadData()
-    const onFocus = () => loadData()
-    window.addEventListener('focus', onFocus)
-    document.addEventListener('visibilitychange', onFocus)
-    return () => {
-      window.removeEventListener('focus', onFocus)
-      document.removeEventListener('visibilitychange', onFocus)
+  }, [user])
+
+  // Reload when app comes to foreground (catches new day)
+  useEffect(() => {
+    if (!user) return
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') loadData()
     }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
   }, [user])
 
   // Debounced food search
