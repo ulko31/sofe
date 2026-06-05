@@ -8,7 +8,7 @@ const deliveryServices = [
   { id: 'imeal', name: 'iMeal', emoji: '🥩', period: '6 месяцев' }
 ]
 
-export default function Nutrition({ user }) {
+export default function Nutrition({ user, onTabChange }) {
   const { haptic } = useTelegram()
   const [stats, setStats] = useState({ consumed: 0, goal: user?.calories || 2000, protein: 0, fat: 0, carbs: 0 })
   const [recipes, setRecipes] = useState([])
