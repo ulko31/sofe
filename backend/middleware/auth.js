@@ -13,7 +13,6 @@ module.exports = async function auth(req, res, next) {
       return res.status(401).json({ error: 'No Telegram auth' })
     }
 
-    // Parse user from initData
     const params = new URLSearchParams(initData)
     const userStr = params.get('user')
 
@@ -40,7 +39,6 @@ module.exports = async function auth(req, res, next) {
       return res.status(500).json({ error: 'DB not configured' })
     }
 
-    // Find or create user
     let user = await turso.queryOne(
       'SELECT * FROM users WHERE telegram_id = ?',
       [String(tgUser.id)]
