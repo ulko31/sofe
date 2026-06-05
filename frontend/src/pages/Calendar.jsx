@@ -50,8 +50,18 @@ export default function Calendar({ onTabChange, onBack }) {
 
   const getEventsForDay = (date) => {
     if (!date) return []
-    const ds = date.toISOString().split('T')[0]
+    // Use local date parts to avoid timezone issues
+    const y = date.getFullYear()
+    const m = String(date.getMonth() + 1).padStart(2, '0')
+    const d = String(date.getDate()).padStart(2, '0')
+    const ds = `${y}-${m}-${d}`
     return events.filter(e => e.date === ds)
+  }
+
+  // Parse event date without timezone shift
+  const parseDate = (dateStr) => {
+    const [y, m, d] = dateStr.split('-').map(Number)
+    return new Date(y, m - 1, d)
   }
 
   const selectedDayEvents = getEventsForDay(selectedDay)
@@ -76,16 +86,19 @@ export default function Calendar({ onTabChange, onBack }) {
   // Upcoming events (next 30 days)
   const upcoming = events
     .filter(e => {
-      const d = new Date(e.date)
+      const d = parseDate(e.date)
       const diff = (d - today) / 86400000
-      return diff >= 0 && diff <= 30
+      return diff >= -1 && diff <= 30
     })
-    .sort((a, b) => new Date(a.date) - new Date(b.date))
+    .sort((a, b) => parseDate(a.date) - parseDate(b.date))
     .slice(0, 10)
 
   return (
     <div className="screen">
-      <h2 style={{ fontSize: 20, fontWeight: 900 }}>Календарь</h2>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        {onBack && <button onClick={onBack} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: 'var(--text)', padding: '0 4px' }}>←</button>}
+        <h2 style={{ fontSize: 20, fontWeight: 900 }}>Календарь</h2>
+      </div>
 
       {/* Month navigation */}
       <div className="card" style={{ padding: '12px 16px' }}>
