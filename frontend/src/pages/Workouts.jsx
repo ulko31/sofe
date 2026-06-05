@@ -7,13 +7,25 @@ const workoutEmoji = { FIT: '🏃‍♀️', Stretching: '🧘‍♀️', 'Fit b
 
 function getVideoEmbedUrl(url) {
   if (!url) return null
-  // YouTube
+  const driveId = extractDriveId(url)
+  if (driveId) return `https://drive.google.com/file/d/${driveId}/preview`
   const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]+)/)
   if (ytMatch) return `https://www.youtube.com/embed/${ytMatch[1]}?rel=0&showinfo=0`
-  // Google Drive
-  const driveMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/)
-  if (driveMatch) return `https://drive.google.com/file/d/${driveMatch[1]}/preview`
-  if (url.includes('drive.google.com')) return url.replace('/view', '/preview').replace('?usp=sharing', '')
+  return url
+}
+
+function extractDriveId(url) {
+  if (!url) return null
+  const m = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/)
+  if (m) return m[1]
+  const m2 = url.match(/id=([a-zA-Z0-9_-]+)/)
+  if (m2) return m2[1]
+  return null
+}
+
+function getDriveThumbnail(url) {
+  const id = extractDriveId(url)
+  if (id) return `https://drive.google.com/thumbnail?id=${id}&sz=w400`
   return url
 }
 
@@ -93,7 +105,10 @@ export default function Workouts() {
 
   return (
     <div className="screen">
-      <h2 style={{ fontSize: 20, fontWeight: 900 }}>Тренировки</h2>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        {onBack && <button onClick={onBack} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: 'var(--text)', padding: '0 4px' }}>←</button>}
+        <h2 style={{ fontSize: 20, fontWeight: 900 }}>Тренировки</h2>
+      </div>
 
       {/* Filters */}
       <div style={{ display: 'flex', gap: 8, overflowX: 'auto', margin: '0 -16px', padding: '0 16px' }}>
@@ -116,7 +131,7 @@ export default function Workouts() {
               {/* Thumbnail or emoji */}
               <div style={{ width: 90, flexShrink: 0, background: w.type === 'Stretching' || w.type === 'Йога' ? 'var(--green-light)' : 'var(--pink-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
                 {w.thumbnail_url ? (
-                  <img src={w.thumbnail_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img src={getDriveThumbnail(w.thumbnail_url)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => e.target.style.display='none'} />
                 ) : (
                   <span style={{ fontSize: 32 }}>{workoutEmoji[w.type] || '💪'}</span>
                 )}
