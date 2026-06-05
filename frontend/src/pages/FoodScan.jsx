@@ -13,6 +13,7 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
   const [weight, setWeight] = useState('100')
   const [manualBarcode, setManualBarcode] = useState('')
   const [editName, setEditName] = useState('')
+  const [editCal, setEditCal] = useState(0)
   const fileRef = useRef(null)
   const fileEnvRef = useRef(null)
   const scannerRef = useRef(null)
@@ -28,9 +29,18 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
 
   const stopScanner = () => {
     if (scannerRef.current) {
+      try { scannerRef.current.reset?.() } catch(e) {}
       try { scannerRef.current.stop?.().catch?.(() => {}) } catch(e) {}
       scannerRef.current = null
     }
+    // Stop video tracks
+    try {
+      const video = document.getElementById('zxing-video')
+      if (video?.srcObject) {
+        video.srcObject.getTracks().forEach(t => t.stop())
+        video.srcObject = null
+      }
+    } catch(e) {}
     detectedRef.current = false
   }
 
@@ -44,7 +54,7 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
     setEditName('')
   }
 
-  // ── BARCODE ───────────────────────────────────────────────
+  // ── BARCODE via ZXing-browser ─────────────────────────────
   const startBarcodeScanner = async () => {
     setMode('barcode')
     setScanning(true)
@@ -52,12 +62,12 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
     setResult(null)
     detectedRef.current = false
 
-    // Load html5-qrcode
-    if (!window.Html5Qrcode) {
+    // Load ZXing
+    if (!window.ZXingBrowser) {
       try {
         await new Promise((res, rej) => {
           const s = document.createElement('script')
-          s.src = 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js'
+          s.src = 'https://unpkg.com/@zxing/browser@latest/umd/index.min.js'
           s.onload = res; s.onerror = rej
           document.head.appendChild(s)
         })
@@ -68,41 +78,39 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
       }
     }
 
-    await new Promise(r => setTimeout(r, 300))
+    await new Promise(r => setTimeout(r, 200))
 
     try {
-      const html5QrCode = new window.Html5Qrcode('qr-reader')
-      scannerRef.current = html5QrCode
+      const hints = new Map()
+      const formats = [
+        window.ZXingBrowser?.BarcodeFormat?.EAN_13,
+        window.ZXingBrowser?.BarcodeFormat?.EAN_8,
+        window.ZXingBrowser?.BarcodeFormat?.UPC_A,
+        window.ZXingBrowser?.BarcodeFormat?.UPC_E,
+        window.ZXingBrowser?.BarcodeFormat?.CODE_128,
+      ].filter(v => v !== undefined)
+      if (formats.length) hints.set(window.ZXingBrowser.DecodeHintType?.POSSIBLE_FORMATS, formats)
 
-      const config = {
-        fps: 15,
-        qrbox: (w, h) => ({ width: Math.min(280, w * 0.8), height: 120 }),
-        aspectRatio: 16/9,
-        formatsToSupport: [
-          window.Html5QrcodeSupportedFormats?.EAN_13,
-          window.Html5QrcodeSupportedFormats?.EAN_8,
-          window.Html5QrcodeSupportedFormats?.UPC_A,
-          window.Html5QrcodeSupportedFormats?.UPC_E,
-          window.Html5QrcodeSupportedFormats?.CODE_128,
-        ].filter(Boolean)
-      }
+      const codeReader = new window.ZXingBrowser.BrowserMultiFormatReader(hints)
+      scannerRef.current = codeReader
 
-      await html5QrCode.start(
-        { facingMode: 'environment' },
-        config,
-        async (decodedText) => {
-          if (detectedRef.current) return
+      const videoEl = document.getElementById('zxing-video')
+
+      await codeReader.decodeFromVideoDevice(
+        undefined,
+        videoEl,
+        (result, err) => {
+          if (!result || detectedRef.current) return
           detectedRef.current = true
           haptic('medium')
-          await html5QrCode.stop().catch(() => {})
+          codeReader.reset()
           scannerRef.current = null
           setScanning(false)
-          await lookupBarcode(decodedText)
-        },
-        () => {} // ignore errors during scanning
+          lookupBarcode(result.getText())
+        }
       )
     } catch(e) {
-      console.error('Scanner start error:', e)
+      console.error('ZXing error:', e)
       setError('Не удалось запустить камеру. Введи штрихкод вручную ниже.')
       setScanning(false)
     }
@@ -134,6 +142,7 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
       }
       setResult(res)
       setEditName(res.name)
+      setEditCal(res.calories)
     } catch(e) {
       setError('Ошибка сети. Проверь интернет и попробуй снова.')
     } finally {
@@ -229,7 +238,7 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
     try {
       await addMeal({
         name: editName || result.name,
-        calories: Math.round(result.calories * ratio),
+        calories: Math.round((editCal || result.calories) * ratio),
         protein: Math.round(result.protein * ratio * 10) / 10,
         fat: Math.round(result.fat * ratio * 10) / 10,
         carbs: Math.round(result.carbs * ratio * 10) / 10,
@@ -243,7 +252,7 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
     }
   }
 
-  const calcCal = () => result ? Math.round(result.calories * (parseFloat(weight) || 100) / (result.unit_weight || 100)) : 0
+  const calcCal = () => result ? Math.round((editCal || result.calories) * (parseFloat(weight) || 100) / (result.unit_weight || 100)) : 0
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: 'var(--bg)' }}>
@@ -313,7 +322,9 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
         {mode === 'barcode' && scanning && (
           <div>
             <div style={{ borderRadius: 12, overflow: 'hidden', background: '#000', width: '100%' }}>
-              <div id="qr-reader" style={{ width: '100%' }} />
+              <video id="zxing-video"
+              style={{ width: '100%', display: 'block' }}
+              autoPlay muted playsInline />
             </div>
             <div style={{ textAlign: 'center', padding: '12px 0', color: 'var(--text-muted)', fontSize: 13 }}>
               Держи камеру ровно, штрихкод в рамке • Подожди 2-3 сек
@@ -356,7 +367,14 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
                   <input value={editName} onChange={e => setEditName(e.target.value)}
                     style={{ fontSize: 15, fontWeight: 800, border: 'none', borderBottom: '1.5px solid var(--pink-mid)', background: 'transparent', width: '100%', padding: '2px 0', fontFamily: 'Nunito, sans-serif', marginBottom: 4 }} />
                   {result.brand && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{result.brand}</div>}
-                  {result.source === 'photo' && <div style={{ fontSize: 11, color: 'var(--green)', fontWeight: 700 }}>🤖 ИИ · можно исправить</div>}
+                  {result.source === 'photo' && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                      <input type="number" value={editCal}
+                        onChange={e => setEditCal(parseFloat(e.target.value) || 0)}
+                        style={{ width: 60, fontSize: 12, padding: '2px 6px', border: '1px solid var(--pink-mid)', borderRadius: 6 }} />
+                      <span style={{ fontSize: 11, color: 'var(--green)', fontWeight: 600 }}>ккал/100г · 🤖 ИИ</span>
+                    </div>
+                  )}
                   {result.barcode && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>📦 {result.barcode}</div>}
                 </div>
               </div>
@@ -398,11 +416,7 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
       </div>
 
       <style>{`
-        #qr-reader { width: 100% !important; }
-        #qr-reader video { width: 100% !important; }
-        #qr-reader__scan_region { background: transparent !important; }
-        #qr-reader__dashboard { background: var(--white); padding: 8px; }
-        #qr-reader__dashboard_section_swaplink { display: none; }
+        #zxing-video { width: 100% !important; object-fit: cover; }
       `}</style>
     </div>
   )
