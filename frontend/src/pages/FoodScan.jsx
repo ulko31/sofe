@@ -28,19 +28,8 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
   }, [initialMode])
 
   const stopScanner = () => {
-    if (scannerRef.current) {
-      try { scannerRef.current.reset?.() } catch(e) {}
-      try { scannerRef.current.stop?.().catch?.(() => {}) } catch(e) {}
-      scannerRef.current = null
-    }
-    // Stop video tracks
-    try {
-      const video = document.getElementById('zxing-video')
-      if (video?.srcObject) {
-        video.srcObject.getTracks().forEach(t => t.stop())
-        video.srcObject = null
-      }
-    } catch(e) {}
+    try { window.Telegram?.WebApp?.closeScanQrPopup?.() } catch(e) {}
+    scannerRef.current = null
     detectedRef.current = false
   }
 
@@ -54,64 +43,35 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
     setEditName('')
   }
 
-  // ── BARCODE via ZXing-browser ─────────────────────────────
-  const startBarcodeScanner = async () => {
+  // ── BARCODE via Telegram QR API ──────────────────────────
+  const startBarcodeScanner = () => {
     setMode('barcode')
-    setScanning(true)
     setError(null)
     setResult(null)
     detectedRef.current = false
 
-    // Load ZXing
-    if (!window.ZXingBrowser) {
-      try {
-        await new Promise((res, rej) => {
-          const s = document.createElement('script')
-          s.src = 'https://unpkg.com/@zxing/browser@latest/umd/index.min.js'
-          s.onload = res; s.onerror = rej
-          document.head.appendChild(s)
-        })
-      } catch(e) {
-        setError('Не удалось загрузить сканер. Введи штрихкод вручную.')
-        setScanning(false)
-        return
-      }
-    }
-
-    await new Promise(r => setTimeout(r, 200))
-
-    try {
-      const hints = new Map()
-      const formats = [
-        window.ZXingBrowser?.BarcodeFormat?.EAN_13,
-        window.ZXingBrowser?.BarcodeFormat?.EAN_8,
-        window.ZXingBrowser?.BarcodeFormat?.UPC_A,
-        window.ZXingBrowser?.BarcodeFormat?.UPC_E,
-        window.ZXingBrowser?.BarcodeFormat?.CODE_128,
-      ].filter(v => v !== undefined)
-      if (formats.length) hints.set(window.ZXingBrowser.DecodeHintType?.POSSIBLE_FORMATS, formats)
-
-      const codeReader = new window.ZXingBrowser.BrowserMultiFormatReader(hints)
-      scannerRef.current = codeReader
-
-      const videoEl = document.getElementById('zxing-video')
-
-      await codeReader.decodeFromVideoDevice(
-        undefined,
-        videoEl,
-        (result, err) => {
-          if (!result || detectedRef.current) return
-          detectedRef.current = true
-          haptic('medium')
-          codeReader.reset()
-          scannerRef.current = null
-          setScanning(false)
-          lookupBarcode(result.getText())
+    const tg = window.Telegram?.WebApp
+    if (tg?.showScanQrPopup) {
+      setScanning(true)
+      tg.showScanQrPopup(
+        { text: 'Наведи камеру на штрихкод продукта' },
+        (data) => {
+          if (!data || detectedRef.current) return false
+          // Check if it looks like a barcode (digits only, 8-14 chars)
+          const cleaned = data.replace(/[^0-9]/g, '')
+          if (cleaned.length >= 8) {
+            detectedRef.current = true
+            haptic('medium')
+            tg.closeScanQrPopup()
+            setScanning(false)
+            lookupBarcode(cleaned)
+            return true
+          }
+          return false
         }
       )
-    } catch(e) {
-      console.error('ZXing error:', e)
-      setError('Не удалось запустить камеру. Введи штрихкод вручную ниже.')
+    } else {
+      // Fallback — show manual input
       setScanning(false)
     }
   }
@@ -416,7 +376,7 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
       </div>
 
       <style>{`
-        #zxing-video { width: 100% !important; object-fit: cover; }
+  
       `}</style>
     </div>
   )
