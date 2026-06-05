@@ -14,6 +14,12 @@ import AIAssistant from './pages/AIAssistant'
 export default function App() {
   const { user } = useTelegram()
   const [tab, setTab] = useState('home')
+  const [prevTab, setPrevTab] = useState(null)
+
+  const navigate = (newTab) => {
+    setPrevTab(tab)
+    setTab(newTab)
+  }
   const [showAI, setShowAI] = useState(false)
   const [appUser, setAppUser] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -96,7 +102,7 @@ export default function App() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      <Screen user={appUser} tgUser={user} onTabChange={setTab} onOpenAI={() => setShowAI(true)} />
+      <Screen user={appUser} tgUser={user} onTabChange={navigate} prevTab={prevTab} onBack={prevTab ? () => { setTab(prevTab); setPrevTab(null) } : null} onOpenAI={() => setShowAI(true)} />
       <BottomNav active={tab} onChange={setTab} />
     </div>
   )
