@@ -8,7 +8,7 @@ const deliveryServices = [
   { id: 'imeal', name: 'iMeal', emoji: '🥩', period: '6 месяцев' }
 ]
 
-export default function Nutrition({ user, onTabChange }) {
+export default function Nutrition({ user, onTabChange, onBack }) {
   const { haptic } = useTelegram()
   const [stats, setStats] = useState({ consumed: 0, goal: user?.calories || 2000, protein: 0, fat: 0, carbs: 0 })
   const [recipes, setRecipes] = useState([])
@@ -32,7 +32,10 @@ export default function Nutrition({ user, onTabChange }) {
 
   return (
     <div className="screen">
-      <h2 style={{ fontSize: 20, fontWeight: 900 }}>Питание</h2>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        {onBack && <button onClick={onBack} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "var(--text)" }}>←</button>}
+        <h2 style={{ fontSize: 20, fontWeight: 900 }}>Питание</h2>
+      </div>
 
       {/* Macros */}
       <div className="card">
