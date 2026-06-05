@@ -262,9 +262,14 @@ bot.on('message', async (msg) => {
 
   try {
     await bot.sendChatAction(msg.chat.id, 'typing')
+    if (!GROQ_TOKEN) {
+      console.error('GROQ_TOKEN not set!')
+      return bot.sendMessage(msg.chat.id, '⚙️ ИИ не настроен. Добавь GROQ_TOKEN в переменные окружения.')
+    }
     const reply = await askGroq(system, msg.text)
+    console.log('Groq reply:', reply ? 'OK' : 'NULL')
     await bot.sendMessage(msg.chat.id,
-      reply || '🌸 Открой приложение SOFE для полного функционала!',
+      reply || '🤔 Не удалось получить ответ. Попробуй ещё раз.',
       { reply_markup: { inline_keyboard: openAppBtn() } })
   } catch(e) { console.error('AI error:', e.message) }
 })
