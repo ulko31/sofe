@@ -129,6 +129,17 @@ export default function Home({ user, onOpenAI, onTabChange }) {
     } catch (e) {}
   }
 
+  const handleTrackerInput = async (key, label, unit, step = 1) => {
+    const current = trackers[key] || 0
+    const val = prompt(`${label} (${unit}):`, current)
+    if (val === null) return
+    const num = parseFloat(val)
+    if (isNaN(num) || num < 0) return
+    haptic('light')
+    setTrackers(t => ({ ...t, [key]: num }))
+    await updateTracker(key, num).catch(() => {})
+  }
+
   const handleWaterAdd = async () => {
     haptic('medium')
     const newVal = +(trackers.water || 0) + 0.25
@@ -231,7 +242,7 @@ export default function Home({ user, onOpenAI, onTabChange }) {
         <div className="section-header"><h3>Трекеры</h3></div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           {[
-            { key: 'water', label: 'Вода', icon: 'ti-droplet', val: `${(trackers.water || 0).toFixed(1)} л`, max: 3, color: 'pink', action: handleWaterAdd, hint: '+250мл' },
+            { key: 'water', label: 'Вода', icon: 'ti-droplet', val: `${Number(trackers.water || 0).toFixed(1)} л`, max: 3, color: 'pink', action: handleWaterAdd, hint: '+250мл' },
             { key: 'steps', label: 'Шаги', icon: 'ti-run', val: `${(trackers.steps || 0).toLocaleString('ru')}`, max: 10000, color: 'green' },
             { key: 'sleep', label: 'Сон', icon: 'ti-moon', val: `${trackers.sleep || 0} ч`, max: 9, color: 'pink' },
             { key: 'pulse', label: 'Пульс', icon: 'ti-heart-rate-monitor', val: `${trackers.pulse || 72} уд/мин`, max: 100, color: 'green' }
@@ -497,6 +508,7 @@ export default function Home({ user, onOpenAI, onTabChange }) {
 function RecipesPreview() {
   const { haptic } = useTelegram()
   const [recipes, setRecipes] = useState([])
+  const [selected, setSelected] = useState(null)
 
   useEffect(() => {
     import('../utils/api').then(m => {
@@ -512,16 +524,57 @@ function RecipesPreview() {
     </div>
   )
 
+  if (selected) return (
+    <div style={{ background: 'var(--white)', borderRadius: 'var(--radius)', border: '0.5px solid var(--border)' }}>
+      <div style={{ position: 'relative' }}>
+        {selected.image_url
+          ? <img src={selected.image_url} alt={selected.name} style={{ width: '100%', height: 160, objectFit: 'cover', borderRadius: '12px 12px 0 0' }} onError={e => e.target.style.display='none'} />
+          : <div style={{ height: 120, background: 'var(--pink-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 52, borderRadius: '12px 12px 0 0' }}>{selected.emoji}</div>
+        }
+        <button onClick={() => setSelected(null)} style={{ position: 'absolute', top: 10, left: 10, background: 'rgba(255,255,255,0.9)', border: 'none', borderRadius: '50%', width: 32, height: 32, fontSize: 16, cursor: 'pointer' }}>←</button>
+      </div>
+      <div style={{ padding: 16 }}>
+        <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 4 }}>{selected.name}</div>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>{selected.calories} ккал · {selected.time} мин · {selected.servings} порции</div>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+          {[['Б', selected.protein, '#3498DB'], ['Ж', selected.fat, '#FF9800'], ['У', selected.carbs, '#2ECC71']].map(([l,v,c]) => (
+            <div key={l} style={{ flex: 1, textAlign: 'center', background: 'var(--bg)', borderRadius: 8, padding: '6px 4px' }}>
+              <div style={{ fontSize: 14, fontWeight: 900, color: c }}>{v}г</div>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{l}</div>
+            </div>
+          ))}
+        </div>
+        {(selected.ingredients || []).length > 0 && (
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 8 }}>Ингредиенты:</div>
+            {(selected.ingredients || []).map((ing, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '5px 0', borderBottom: '0.5px solid var(--border)' }}>
+                <span>{ing.name}</span><span style={{ color: 'var(--text-muted)' }}>{ing.amount}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {(selected.steps || []).length > 0 && (
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 8 }}>Приготовление:</div>
+            {(selected.steps || []).map((s, i) => (
+              <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
+                <div style={{ width: 22, height: 22, borderRadius: '50%', background: 'var(--pink)', color: 'white', fontSize: 11, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{i+1}</div>
+                <div style={{ fontSize: 13, lineHeight: 1.5, paddingTop: 2 }}>{s.text || s}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
       {recipes.map(r => (
-        <div key={r.id} onClick={() => { haptic('light'); onTabChange?.('nutrition') }}
+        <div key={r.id} onClick={() => { haptic('light'); setSelected(r) }}
           style={{ background: 'var(--white)', borderRadius: 'var(--radius)', overflow: 'hidden', cursor: 'pointer', border: '0.5px solid var(--border)', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-          {r.image_url ? (
-            <img src={r.image_url} alt={r.name} style={{ width: '100%', height: 90, objectFit: 'cover' }} onError={e => { e.target.style.display='none' }} />
-          ) : (
-            <div style={{ width: '100%', height: 90, background: 'var(--pink-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36 }}>{r.emoji || '🍽'}</div>
-          )}
+          <div style={{ width: '100%', height: 90, background: 'var(--pink-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36 }}>{r.emoji || '🍽'}</div>
           <div style={{ padding: '10px 12px' }}>
             <div style={{ fontSize: 12, fontWeight: 800, lineHeight: 1.3 }}>{r.name}</div>
             <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 3 }}>{r.calories} ккал · {r.time} мин</div>
