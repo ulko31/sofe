@@ -28,7 +28,6 @@ app.use('/api/foods', foodsRoutes)
 app.use('/api/ai', aiRoutes)
 app.use('/api/admin', adminRoutes)
 app.use('/api/friends', friendsRoutes)
-app.use('/api/trackers', (req, res, next) => { req.url = '/'; miscRoutes(req, res, next) })
 app.use('/api', miscRoutes)
 
 app.get('/health', (req, res) => res.json({ ok: true, version: '1.0.0' }))
