@@ -83,9 +83,11 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
             type: 'LiveStream',
             target: container,
             constraints: {
-              facingMode: 'environment',
+              facingMode: { exact: 'environment' },
               width: { ideal: 1280 },
-              height: { ideal: 720 }
+              height: { ideal: 720 },
+              focusMode: 'continuous',
+              advanced: [{ focusMode: 'continuous' }]
             },
             area: {
               top: '20%', right: '10%',
