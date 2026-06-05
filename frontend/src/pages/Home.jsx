@@ -243,9 +243,9 @@ export default function Home({ user, onOpenAI, onTabChange }) {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           {[
             { key: 'water', label: 'Вода', icon: 'ti-droplet', val: `${Number(trackers.water || 0).toFixed(1)} л`, max: 3, color: 'pink', action: handleWaterAdd, hint: '+250мл' },
-            { key: 'steps', label: 'Шаги', icon: 'ti-run', val: `${(trackers.steps || 0).toLocaleString('ru')}`, max: 10000, color: 'green' },
-            { key: 'sleep', label: 'Сон', icon: 'ti-moon', val: `${trackers.sleep || 0} ч`, max: 9, color: 'pink' },
-            { key: 'pulse', label: 'Пульс', icon: 'ti-heart-rate-monitor', val: `${trackers.pulse || 72} уд/мин`, max: 100, color: 'green' }
+            { key: 'steps', label: 'Шаги', icon: 'ti-run', val: `${(trackers.steps || 0).toLocaleString('ru')}`, max: 10000, color: 'green', action: () => handleTrackerInput('steps', 'Шаги', 'шт'), hint: '✏️' },
+            { key: 'sleep', label: 'Сон', icon: 'ti-moon', val: `${trackers.sleep || 0} ч`, max: 9, color: 'pink', action: () => handleTrackerInput('sleep', 'Сон', 'часов'), hint: '✏️' },
+            { key: 'pulse', label: 'Пульс', icon: 'ti-heart-rate-monitor', val: `${trackers.pulse || 72} уд/мин`, max: 100, color: 'green', action: () => handleTrackerInput('pulse', 'Пульс', 'уд/мин'), hint: '✏️' }
           ].map(t => {
             const num = parseFloat(trackers[t.key] || 0)
             const pct = Math.min(100, (num / t.max) * 100)
@@ -574,7 +574,10 @@ function RecipesPreview() {
       {recipes.map(r => (
         <div key={r.id} onClick={() => { haptic('light'); setSelected(r) }}
           style={{ background: 'var(--white)', borderRadius: 'var(--radius)', overflow: 'hidden', cursor: 'pointer', border: '0.5px solid var(--border)', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-          <div style={{ width: '100%', height: 90, background: 'var(--pink-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36 }}>{r.emoji || '🍽'}</div>
+          {r.image_url
+            ? <img src={r.image_url} alt={r.name} style={{ width: '100%', height: 90, objectFit: 'cover' }} onError={e => { e.target.style.display='none'; e.target.nextSibling.style.display='flex' }} />
+            : null}
+          <div style={{ width: '100%', height: 90, background: 'var(--pink-light)', display: r.image_url ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36 }}>{r.emoji || '🍽'}</div>
           <div style={{ padding: '10px 12px' }}>
             <div style={{ fontSize: 12, fontWeight: 800, lineHeight: 1.3 }}>{r.name}</div>
             <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 3 }}>{r.calories} ккал · {r.time} мин</div>
