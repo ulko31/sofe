@@ -67,4 +67,26 @@ router.delete('/meals/:id', auth, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }) }
 })
 
+// GET /api/nutrition/history
+router.get('/history', auth, async (req, res) => {
+  const days = parseInt(req.query.days) || 7
+  const result = []
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date()
+    d.setDate(d.getDate() - i)
+    const dateStr = d.toISOString().split('T')[0]
+    try {
+      const meals = await q('SELECT * FROM meals WHERE user_id = ? AND date = ?', [req.user.id, dateStr])
+      const consumed = meals.reduce((s, m) => s + (m.calories || 0), 0)
+      const protein = meals.reduce((s, m) => s + (m.protein || 0), 0)
+      const fat = meals.reduce((s, m) => s + (m.fat || 0), 0)
+      const carbs = meals.reduce((s, m) => s + (m.carbs || 0), 0)
+      result.push({ date: dateStr, consumed: Math.round(consumed), protein: Math.round(protein), fat: Math.round(fat), carbs: Math.round(carbs) })
+    } catch(e) {
+      result.push({ date: dateStr, consumed: 0, protein: 0, fat: 0, carbs: 0 })
+    }
+  }
+  res.json(result)
+})
+
 module.exports = router
