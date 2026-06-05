@@ -129,15 +129,21 @@ export default function Home({ user, onOpenAI, onTabChange }) {
     } catch (e) {}
   }
 
-  const handleTrackerInput = async (key, label, unit, step = 1) => {
-    const current = trackers[key] || 0
-    const val = prompt(`${label} (${unit}):`, current)
-    if (val === null) return
-    const num = parseFloat(val)
-    if (isNaN(num) || num < 0) return
+  const [trackerModal, setTrackerModal] = useState(null) // {key, label, unit, value}
+
+  const handleTrackerInput = (key, label, unit) => {
     haptic('light')
-    setTrackers(t => ({ ...t, [key]: num }))
-    await updateTracker(key, num).catch(() => {})
+    setTrackerModal({ key, label, unit, value: String(trackers[key] || '') })
+  }
+
+  const saveTrackerModal = async () => {
+    if (!trackerModal) return
+    const num = parseFloat(trackerModal.value)
+    if (isNaN(num) || num < 0) { setTrackerModal(null); return }
+    haptic('medium')
+    setTrackers(t => ({ ...t, [trackerModal.key]: num }))
+    setTrackerModal(null)
+    await updateTracker(trackerModal.key, num).catch(() => {})
   }
 
   const handleWaterAdd = async () => {
@@ -501,6 +507,30 @@ export default function Home({ user, onOpenAI, onTabChange }) {
         </div>
         <RecipesPreview />
 
+      {/* Tracker input modal */}
+      {trackerModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <div style={{ background: 'var(--white)', borderRadius: 20, padding: 24, width: '100%', maxWidth: 320 }}>
+            <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 16, textAlign: 'center' }}>{trackerModal.label}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+              <input
+                type="number"
+                value={trackerModal.value}
+                onChange={e => setTrackerModal(m => ({ ...m, value: e.target.value }))}
+                style={{ flex: 1, fontSize: 24, fontWeight: 800, textAlign: 'center' }}
+                autoFocus
+                onKeyDown={e => e.key === 'Enter' && saveTrackerModal()}
+              />
+              <span style={{ fontSize: 14, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{trackerModal.unit}</span>
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button className="btn-outline" style={{ flex: 1 }} onClick={() => setTrackerModal(null)}>Отмена</button>
+              <button className="btn-primary" style={{ flex: 1 }} onClick={saveTrackerModal}>Сохранить</button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }
@@ -575,9 +605,9 @@ function RecipesPreview() {
         <div key={r.id} onClick={() => { haptic('light'); setSelected(r) }}
           style={{ background: 'var(--white)', borderRadius: 'var(--radius)', overflow: 'hidden', cursor: 'pointer', border: '0.5px solid var(--border)', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
           {r.image_url
-            ? <img src={r.image_url} alt={r.name} style={{ width: '100%', height: 90, objectFit: 'cover' }} onError={e => { e.target.style.display='none'; e.target.nextSibling.style.display='flex' }} />
-            : null}
-          <div style={{ width: '100%', height: 90, background: 'var(--pink-light)', display: r.image_url ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36 }}>{r.emoji || '🍽'}</div>
+            ? <img src={r.image_url} alt={r.name} style={{ width: '100%', height: 90, objectFit: 'cover' }} />
+            : <div style={{ width: '100%', height: 90, background: 'var(--pink-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40 }}>{r.emoji || '🍽'}</div>
+          }
           <div style={{ padding: '10px 12px' }}>
             <div style={{ fontSize: 12, fontWeight: 800, lineHeight: 1.3 }}>{r.name}</div>
             <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 3 }}>{r.calories} ккал · {r.time} мин</div>
