@@ -37,8 +37,11 @@ async function getTodayStats(userId) {
 async function getUpcomingEvents(days = 7) {
   const today = new Date().toISOString().split('T')[0]
   const future = new Date(Date.now() + days * 86400000).toISOString().split('T')[0]
-  try { return await query('SELECT * FROM events WHERE date BETWEEN ? AND ? ORDER BY date ASC', [today, future]) }
-  catch(e) { return [] }
+  try {
+    const events = await query('SELECT * FROM events WHERE date >= ? ORDER BY date ASC LIMIT 20', [today])
+    return events || []
+  }
+  catch(e) { console.error('events error:', e.message); return [] }
 }
 
 async function askGroq(system, userMsg) {
@@ -237,12 +240,14 @@ bot.onText(/\/help/, async (msg) => {
 })
 
 // ── Свободный ИИ-чат ──────────────────────────────────────
-const SKIP = ['/start', '/today', '/events', '/share', '/eat', '/workout', '/motivate', '/help',
-  '🌸', '📊', '🥗', '💪', '📅', '🏆']
+const SKIP = ['/start', '/today', '/events', '/share', '/eat ', '/workout', '/motivate', '/help',
+  '🌸 Открыть', '📊 Стат', '🥗 Добав', '💪 Трен', '📅 Меро', '🏆 Дост']
 
 bot.on('message', async (msg) => {
   if (!msg.text) return
   if (SKIP.some(s => msg.text.startsWith(s))) return
+  // Skip /eat without args (handled above)
+  if (msg.text === '🥗 Добавить еду') return
 
   const user = await getUser(msg.from.id)
   const name = user?.name?.split(' ')[0] || msg.from.first_name || 'красотка'
