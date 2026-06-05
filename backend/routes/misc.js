@@ -139,17 +139,21 @@ router.get('/progress', auth, async (req, res) => {
 router.get('/workouts/gyms', auth, async (req, res) => {
   try {
     await exec(`CREATE TABLE IF NOT EXISTS user_gyms (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, name TEXT NOT NULL, total_sessions INTEGER DEFAULT 8, used_sessions INTEGER DEFAULT 0, created_at TEXT DEFAULT (datetime('now')))`)
+    await exec(`CREATE TABLE IF NOT EXISTS workout_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, workout_id INTEGER, gym_id INTEGER, notes TEXT, date TEXT DEFAULT (date('now')), created_at TEXT DEFAULT (datetime('now')))`)
     const gyms = await q('SELECT * FROM user_gyms WHERE user_id = ? ORDER BY name', [req.user.id])
     res.json(gyms)
-  } catch(e) { res.json([]) }
+  } catch(e) { console.error('get gyms:', e.message); res.json([]) }
 })
 
 router.post('/workouts/gyms', auth, async (req, res) => {
-  await exec(`CREATE TABLE IF NOT EXISTS user_gyms (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, name TEXT NOT NULL, total_sessions INTEGER DEFAULT 8, used_sessions INTEGER DEFAULT 0, created_at TEXT DEFAULT (datetime('now')))`)
-  const { name, total_sessions } = req.body
-  if (!name) return res.status(400).json({ error: 'name required' })
-  const result = await r('INSERT INTO user_gyms (user_id, name, total_sessions) VALUES (?, ?, ?)', [req.user.id, name, total_sessions || 8])
-  res.json(await qOne('SELECT * FROM user_gyms WHERE id = ?', [result.lastInsertRowid]))
+  try {
+    await exec(`CREATE TABLE IF NOT EXISTS user_gyms (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, name TEXT NOT NULL, total_sessions INTEGER DEFAULT 8, used_sessions INTEGER DEFAULT 0, created_at TEXT DEFAULT (datetime('now')))`)
+    const { name, total_sessions } = req.body
+    if (!name) return res.status(400).json({ error: 'name required' })
+    const result = await r('INSERT INTO user_gyms (user_id, name, total_sessions) VALUES (?, ?, ?)', [req.user.id, name, total_sessions || 8])
+    const gym = await qOne('SELECT * FROM user_gyms WHERE id = ?', [result.lastInsertRowid])
+    res.json(gym)
+  } catch(e) { console.error('add gym error:', e.message); res.status(500).json({ error: e.message }) }
 })
 
 router.put('/workouts/gyms/:id', auth, async (req, res) => {
