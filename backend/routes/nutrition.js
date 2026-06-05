@@ -24,7 +24,8 @@ async function r(sql, args = []) {
 
 // GET /api/nutrition/today
 router.get('/today', auth, async (req, res) => {
-  const today = new Date().toISOString().split('T')[0]
+  // Use client-provided date to handle timezone correctly
+  const today = req.query.date || new Date().toISOString().split('T')[0]
   try {
     const user = await qOne('SELECT * FROM users WHERE id = ?', [req.user.id])
     const meals = await q('SELECT * FROM meals WHERE user_id = ? AND date = ?', [req.user.id, today])
