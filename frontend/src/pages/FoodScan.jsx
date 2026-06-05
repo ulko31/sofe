@@ -315,30 +315,22 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
         {/* Main menu */}
         {!mode && !processing && (
           <>
-            {/* Camera inputs */}
-            <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handlePhotoSelect} style={{ display: 'none' }} />
+            {/* Hidden file inputs */}
+            <input ref={fileRef} type="file" accept="image/*" capture="user" onChange={handlePhotoSelect} style={{ display: 'none' }} />
+            <input id="file-env" type="file" accept="image/*" capture="environment" onChange={handlePhotoSelect} style={{ display: 'none' }} />
             <input id="file-gallery" type="file" accept="image/*" onChange={handlePhotoSelect} style={{ display: 'none' }} />
 
             <div style={{ background: 'var(--white)', borderRadius: 'var(--radius)', padding: 20, border: '2px dashed var(--pink-mid)' }}>
               <div style={{ fontSize: 40, marginBottom: 8, textAlign: 'center' }}>📸</div>
               <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 4, textAlign: 'center' }}>Распознать по фото</div>
               <div style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center', marginBottom: 14 }}>ИИ определит калории и БЖУ</div>
-              <div style={{ display: 'flex', gap: 10 }}>
-                <button onClick={() => {
-                  const tg = window.Telegram?.WebApp
-                  // Try Telegram camera first
-                  if (tg?.showScanQrPopup === undefined && tg?.openCamera) {
-                    tg.openCamera()
-                  } else {
-                    // Use capture="environment" for iOS, regular for Android
-                    fileRef.current?.click()
-                  }
-                }}
-                  style={{ flex: 1, padding: '10px', borderRadius: 10, background: 'var(--pink)', color: 'white', border: 'none', fontFamily: 'Nunito, sans-serif', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button onClick={() => document.getElementById('file-env').click()}
+                  style={{ flex: 1, minWidth: 80, padding: '10px 8px', borderRadius: 10, background: 'var(--pink)', color: 'white', border: 'none', fontFamily: 'Nunito, sans-serif', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
                   📷 Камера
                 </button>
                 <button onClick={() => document.getElementById('file-gallery').click()}
-                  style={{ flex: 1, padding: '10px', borderRadius: 10, background: 'var(--bg)', color: 'var(--text)', border: '1.5px solid var(--border)', fontFamily: 'Nunito, sans-serif', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+                  style={{ flex: 1, minWidth: 80, padding: '10px 8px', borderRadius: 10, background: 'var(--bg)', color: 'var(--text)', border: '1.5px solid var(--border)', fontFamily: 'Nunito, sans-serif', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
                   🖼 Галерея
                 </button>
               </div>
