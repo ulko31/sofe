@@ -130,19 +130,13 @@ export default function Nutrition({ user, onTabChange, onBack }) {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 200, display: 'flex', alignItems: 'flex-end' }}>
           <div style={{ background: 'var(--white)', borderRadius: '20px 20px 0 0', width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
             {/* Hero image */}
-            {selectedRecipe.image_url ? (
-              <div style={{ position: 'relative', height: 200 }}>
-                <img src={selectedRecipe.image_url} alt={selectedRecipe.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                <button onClick={() => setSelectedRecipe(null)} style={{ position: 'absolute', top: 16, right: 16, width: 36, height: 36, borderRadius: '50%', background: 'rgba(0,0,0,0.5)', color: 'white', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <i className="ti ti-x" />
-                </button>
-              </div>
-            ) : (
-              <div style={{ padding: '20px 20px 0', display: 'flex', justifyContent: 'space-between' }}>
-                <div style={{ fontSize: 48 }}>{selectedRecipe.emoji}</div>
-                <button onClick={() => setSelectedRecipe(null)} style={{ color: 'var(--text-muted)', fontSize: 22 }}><i className="ti ti-x" /></button>
-              </div>
-            )}
+            <div style={{ position: 'relative', height: 200, borderRadius: '16px 16px 0 0', overflow: 'hidden' }}>
+              {selectedRecipe.image_url
+                ? <img src={selectedRecipe.image_url} alt={selectedRecipe.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                : <div style={{ width: '100%', height: '100%', background: 'var(--pink-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 64 }}>{selectedRecipe.emoji}</div>
+              }
+              <button onClick={() => setSelectedRecipe(null)} style={{ position: 'absolute', top: 12, right: 12, width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.9)', border: 'none', fontSize: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+            </div>
 
             <div style={{ padding: 20 }}>
               <h2 style={{ fontSize: 20, fontWeight: 900, marginBottom: 4 }}>{selectedRecipe.name}</h2>
