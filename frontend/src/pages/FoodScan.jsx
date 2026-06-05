@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useTelegram } from '../hooks/useTelegram'
-import { addMeal, searchFoods } from '../utils/api'
+import { addMeal } from '../utils/api'
 
 export default function FoodScan({ onBack, onMealAdded, initialMode }) {
   const { haptic } = useTelegram()
@@ -13,13 +13,13 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
   const [weight, setWeight] = useState('100')
   const [manualBarcode, setManualBarcode] = useState('')
   const [editName, setEditName] = useState('')
-  const [editCal, setEditCal] = useState(0)
-  const fileRef = useRef(null)
   const fileEnvRef = useRef(null)
-  const scannerRef = useRef(null)
+  const fileGalleryRef = useRef(null)
+  const videoRef = useRef(null)
+  const quaggaRef = useRef(null)
   const detectedRef = useRef(false)
 
-  useEffect(() => () => stopScanner(), [])
+  useEffect(() => () => stopQuagga(), [])
 
   useEffect(() => {
     if (!initialMode) return
@@ -27,14 +27,16 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
     else if (initialMode === 'barcode') setTimeout(() => startBarcodeScanner(), 400)
   }, [initialMode])
 
-  const stopScanner = () => {
-    try { window.Telegram?.WebApp?.closeScanQrPopup?.() } catch(e) {}
-    scannerRef.current = null
+  const stopQuagga = () => {
+    if (quaggaRef.current) {
+      try { quaggaRef.current.stop() } catch(e) {}
+      quaggaRef.current = null
+    }
     detectedRef.current = false
   }
 
   const resetScan = () => {
-    stopScanner()
+    stopQuagga()
     setMode(null)
     setScanning(false)
     setResult(null)
@@ -43,35 +45,73 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
     setEditName('')
   }
 
-  // ── BARCODE via Telegram QR API ──────────────────────────
-  const startBarcodeScanner = () => {
+  // ── BARCODE via Quagga ────────────────────────────────────
+  const startBarcodeScanner = async () => {
     setMode('barcode')
+    setScanning(true)
     setError(null)
     setResult(null)
     detectedRef.current = false
 
-    const tg = window.Telegram?.WebApp
-    if (tg?.showScanQrPopup) {
-      setScanning(true)
-      tg.showScanQrPopup(
-        { text: 'Наведи камеру на штрихкод продукта' },
-        (data) => {
-          if (!data || detectedRef.current) return false
-          // Check if it looks like a barcode (digits only, 8-14 chars)
-          const cleaned = data.replace(/[^0-9]/g, '')
-          if (cleaned.length >= 8) {
-            detectedRef.current = true
-            haptic('medium')
-            tg.closeScanQrPopup()
-            setScanning(false)
-            lookupBarcode(cleaned)
-            return true
-          }
-          return false
-        }
-      )
-    } else {
-      // Fallback — show manual input
+    if (!window.Quagga) {
+      try {
+        await new Promise((res, rej) => {
+          const s = document.createElement('script')
+          s.src = 'https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js'
+          s.onload = res
+          s.onerror = rej
+          document.head.appendChild(s)
+        })
+      } catch(e) {
+        setError('Не удалось загрузить сканер. Введи штрихкод вручную.')
+        setScanning(false)
+        return
+      }
+    }
+
+    await new Promise(r => setTimeout(r, 100))
+    const container = videoRef.current
+    if (!container) { setScanning(false); return }
+
+    try {
+      await new Promise((resolve, reject) => {
+        window.Quagga.init({
+          inputStream: {
+            name: 'Live',
+            type: 'LiveStream',
+            target: container,
+            constraints: {
+              facingMode: 'environment',
+              width: { ideal: 1280 },
+              height: { ideal: 720 }
+            }
+          },
+          locator: { patchSize: 'medium', halfSample: true },
+          numOfWorkers: 2,
+          frequency: 10,
+          decoder: {
+            readers: ['ean_reader', 'ean_8_reader', 'upc_reader', 'upc_e_reader', 'code_128_reader']
+          },
+          locate: true
+        }, err => err ? reject(err) : resolve())
+      })
+
+      quaggaRef.current = window.Quagga
+      window.Quagga.start()
+
+      window.Quagga.onDetected(async data => {
+        if (detectedRef.current) return
+        const code = data.codeResult.code
+        if (!code || code.length < 4) return
+        detectedRef.current = true
+        haptic('medium')
+        stopQuagga()
+        setScanning(false)
+        await lookupBarcode(code)
+      })
+    } catch(e) {
+      console.error('Quagga error:', e)
+      setError('Не удалось запустить камеру. Введи штрихкод вручную.')
       setScanning(false)
     }
   }
@@ -83,7 +123,7 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
       const r = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`)
       const data = await r.json()
       if (data.status === 0 || !data.product) {
-        setError(`Продукт со штрихкодом ${barcode} не найден. Попробуй ввести название вручную.`)
+        setError(`Продукт не найден. Попробуй другой штрихкод или введи вручную.`)
         setProcessing(false)
         return
       }
@@ -102,9 +142,8 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
       }
       setResult(res)
       setEditName(res.name)
-      setEditCal(res.calories)
     } catch(e) {
-      setError('Ошибка сети. Проверь интернет и попробуй снова.')
+      setError('Ошибка сети. Проверь интернет.')
     } finally {
       setProcessing(false)
     }
@@ -120,7 +159,6 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
     setError(null)
     setResult(null)
     haptic('light')
-
     const imageFile = URL.createObjectURL(file)
 
     try {
@@ -128,15 +166,13 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
       if (!groqToken) throw new Error('no_token')
 
       const resized = await resizeImage(file, 512)
-      const dataUrl = `data:image/jpeg;base64,${resized}`
-
       const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${groqToken}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: 'meta-llama/llama-4-scout-17b-16e-instruct',
           messages: [{ role: 'user', content: [
-            { type: 'image_url', image_url: { url: dataUrl, detail: 'low' } },
+            { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${resized}`, detail: 'low' } },
             { type: 'text', text: 'What food is in this image? Reply ONLY with JSON: {"name":"название на русском","calories":kcal_per_100g,"protein":g,"fat":g,"carbs":g}' }
           ]}],
           max_tokens: 100, temperature: 0
@@ -170,6 +206,41 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
     }
   }
 
+  // When name changes for photo — re-ask AI for calories
+  const handleNameChange = async (newName) => {
+    setEditName(newName)
+    if (!newName.trim() || result?.source !== 'photo') return
+    clearTimeout(handleNameChange._t)
+    handleNameChange._t = setTimeout(async () => {
+      try {
+        const groqToken = import.meta.env.VITE_GROQ_TOKEN
+        if (!groqToken) return
+        const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${groqToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'llama-3.3-70b-versatile',
+            messages: [{ role: 'user', content: `Калории и БЖУ на 100г для "${newName}". Только JSON: {"calories":число,"protein":г,"fat":г,"carbs":г}` }],
+            max_tokens: 80, temperature: 0
+          })
+        })
+        const data = await r.json()
+        const text = data.choices?.[0]?.message?.content?.trim() || ''
+        const m = text.match(/\{[^{}]+\}/)
+        if (!m) return
+        const p = JSON.parse(m[0])
+        setResult(prev => ({
+          ...prev,
+          name: newName,
+          calories: Math.round(p.calories) || prev.calories,
+          protein: Math.round((p.protein || prev.protein) * 10) / 10,
+          fat: Math.round((p.fat || prev.fat) * 10) / 10,
+          carbs: Math.round((p.carbs || prev.carbs) * 10) / 10,
+        }))
+      } catch(e) {}
+    }, 800)
+  }
+
   async function resizeImage(file, maxSize) {
     return new Promise((resolve, reject) => {
       const img = new Image()
@@ -194,32 +265,30 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
     haptic('medium')
     const w = parseFloat(weight) || 100
     const ratio = w / (result.unit_weight || 100)
-    const today = new Date().toISOString().split('T')[0]
     try {
       await addMeal({
         name: editName || result.name,
-        calories: Math.round((editCal || result.calories) * ratio),
+        calories: Math.round(result.calories * ratio),
         protein: Math.round(result.protein * ratio * 10) / 10,
         fat: Math.round(result.fat * ratio * 10) / 10,
         carbs: Math.round(result.carbs * ratio * 10) / 10,
-        type: mealType, date: today
+        type: mealType,
+        date: new Date().toISOString().split('T')[0]
       })
       onMealAdded?.()
       haptic('medium')
       onBack()
     } catch(e) {
-      setError('Ошибка при добавлении. Попробуй ещё раз.')
+      setError('Ошибка при добавлении.')
     }
   }
 
-  const calcCal = () => result ? Math.round((editCal || result.calories) * (parseFloat(weight) || 100) / (result.unit_weight || 100)) : 0
+  const calcCal = () => result ? Math.round(result.calories * (parseFloat(weight) || 100) / (result.unit_weight || 100)) : 0
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: 'var(--bg)' }}>
-      {/* Header */}
       <div style={{ background: 'var(--pink)', padding: '48px 16px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button onClick={() => { stopScanner(); onBack() }}
-          style={{ color: 'white', fontSize: 22, background: 'none', border: 'none', cursor: 'pointer' }}>
+        <button onClick={() => { stopQuagga(); onBack() }} style={{ color: 'white', fontSize: 22, background: 'none', border: 'none', cursor: 'pointer' }}>
           <i className="ti ti-arrow-left" />
         </button>
         <div>
@@ -233,9 +302,8 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
         {/* Main menu */}
         {!mode && !processing && (
           <>
-            {/* Photo */}
             <input ref={fileEnvRef} type="file" accept="image/*" capture="environment" onChange={handlePhotoSelect} style={{ display: 'none' }} />
-            <input id="file-gallery" type="file" accept="image/*" onChange={handlePhotoSelect} style={{ display: 'none' }} />
+            <input ref={fileGalleryRef} type="file" accept="image/*" onChange={handlePhotoSelect} style={{ display: 'none' }} />
 
             <div style={{ background: 'var(--white)', borderRadius: 'var(--radius)', padding: 20, border: '2px dashed var(--pink-mid)' }}>
               <div style={{ fontSize: 40, marginBottom: 8, textAlign: 'center' }}>📸</div>
@@ -243,17 +311,16 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
               <div style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center', marginBottom: 14 }}>ИИ определит калории и БЖУ</div>
               <div style={{ display: 'flex', gap: 10 }}>
                 <button onClick={() => fileEnvRef.current?.click()}
-                  style={{ flex: 1, padding: '10px', borderRadius: 10, background: 'var(--pink)', color: 'white', border: 'none', fontFamily: 'Nunito, sans-serif', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+                  style={{ flex: 1, padding: 10, borderRadius: 10, background: 'var(--pink)', color: 'white', border: 'none', fontFamily: 'Nunito, sans-serif', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
                   📷 Камера
                 </button>
-                <button onClick={() => document.getElementById('file-gallery').click()}
-                  style={{ flex: 1, padding: '10px', borderRadius: 10, background: 'var(--bg)', color: 'var(--text)', border: '1.5px solid var(--border)', fontFamily: 'Nunito, sans-serif', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+                <button onClick={() => fileGalleryRef.current?.click()}
+                  style={{ flex: 1, padding: 10, borderRadius: 10, background: 'var(--bg)', color: 'var(--text)', border: '1.5px solid var(--border)', fontFamily: 'Nunito, sans-serif', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
                   🖼 Галерея
                 </button>
               </div>
             </div>
 
-            {/* Barcode */}
             <div onClick={startBarcodeScanner}
               style={{ background: 'var(--white)', borderRadius: 'var(--radius)', padding: 24, textAlign: 'center', cursor: 'pointer', border: '2px dashed var(--green-mid)' }}>
               <div style={{ fontSize: 48, marginBottom: 12 }}>📦</div>
@@ -261,7 +328,6 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
               <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Наведи камеру на упаковку</div>
             </div>
 
-            {/* Manual barcode */}
             <div className="card" style={{ padding: 16 }}>
               <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Ввести штрихкод вручную</div>
               <div style={{ display: 'flex', gap: 8 }}>
@@ -281,21 +347,26 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
         {/* Barcode scanner */}
         {mode === 'barcode' && scanning && (
           <div>
-            <div style={{ borderRadius: 12, overflow: 'hidden', background: '#000', width: '100%' }}>
-              <video id="zxing-video"
-              style={{ width: '100%', display: 'block' }}
-              autoPlay muted playsInline />
+            <div style={{ position: 'relative', borderRadius: 12, overflow: 'hidden', background: '#000', width: '100%', aspectRatio: '4/3' }}>
+              <div ref={videoRef} style={{ width: '100%', height: '100%', position: 'absolute', inset: 0 }} />
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+                <div style={{ width: '80%', height: 90, border: '2px solid var(--pink)', borderRadius: 8 }}>
+                  <div style={{ position: 'absolute', top: -2, left: -2, width: 18, height: 18, borderTop: '3px solid var(--pink)', borderLeft: '3px solid var(--pink)' }} />
+                  <div style={{ position: 'absolute', top: -2, right: -2, width: 18, height: 18, borderTop: '3px solid var(--pink)', borderRight: '3px solid var(--pink)' }} />
+                  <div style={{ position: 'absolute', bottom: -2, left: -2, width: 18, height: 18, borderBottom: '3px solid var(--pink)', borderLeft: '3px solid var(--pink)' }} />
+                  <div style={{ position: 'absolute', bottom: -2, right: -2, width: 18, height: 18, borderBottom: '3px solid var(--pink)', borderRight: '3px solid var(--pink)' }} />
+                </div>
+              </div>
             </div>
             <div style={{ textAlign: 'center', padding: '12px 0', color: 'var(--text-muted)', fontSize: 13 }}>
-              Держи камеру ровно, штрихкод в рамке • Подожди 2-3 сек
+              Держи штрихкод в рамке • Расстояние 10-20 см
             </div>
-            <button className="btn-outline" onClick={() => { stopScanner(); setMode(null); setScanning(false) }}>
+            <button className="btn-outline" onClick={() => { stopQuagga(); setMode(null); setScanning(false) }}>
               Отмена
             </button>
           </div>
         )}
 
-        {/* Processing */}
         {processing && (
           <div style={{ textAlign: 'center', padding: 40 }}>
             <div className="spinner" style={{ margin: '0 auto 16px' }} />
@@ -305,7 +376,6 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
           </div>
         )}
 
-        {/* Error */}
         {error && !processing && (
           <div>
             <div style={{ background: '#FEE2E2', borderRadius: 12, padding: 16, marginBottom: 12 }}>
@@ -315,7 +385,6 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
           </div>
         )}
 
-        {/* Result */}
         {result && !processing && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div className="card">
@@ -324,26 +393,21 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
                   <img src={result.imageFile || result.image} alt="" style={{ width: 70, height: 70, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }} />
                 )}
                 <div style={{ flex: 1 }}>
-                  <input value={editName} onChange={e => setEditName(e.target.value)}
+                  <input value={editName}
+                    onChange={e => handleNameChange(e.target.value)}
+                    placeholder="Название блюда"
                     style={{ fontSize: 15, fontWeight: 800, border: 'none', borderBottom: '1.5px solid var(--pink-mid)', background: 'transparent', width: '100%', padding: '2px 0', fontFamily: 'Nunito, sans-serif', marginBottom: 4 }} />
                   {result.brand && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{result.brand}</div>}
-                  {result.source === 'photo' && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                      <input type="number" value={editCal}
-                        onChange={e => setEditCal(parseFloat(e.target.value) || 0)}
-                        style={{ width: 60, fontSize: 12, padding: '2px 6px', border: '1px solid var(--pink-mid)', borderRadius: 6 }} />
-                      <span style={{ fontSize: 11, color: 'var(--green)', fontWeight: 600 }}>ккал/100г · 🤖 ИИ</span>
-                    </div>
-                  )}
+                  {result.source === 'photo' && <div style={{ fontSize: 11, color: 'var(--green)', fontWeight: 700 }}>🤖 Распознано ИИ · измени название если нужно</div>}
                   {result.barcode && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>📦 {result.barcode}</div>}
                 </div>
               </div>
 
               <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-                {[['Калории', result.calories, 'ккал/100г', 'var(--pink)'], ['Белки', result.protein, 'г', '#3498DB'], ['Жиры', result.fat, 'г', '#FF9800'], ['Углеводы', result.carbs, 'г', 'var(--green)']].map(([l, v, u, c]) => (
+                {[['Калории', result.calories, 'ккал', 'var(--pink)'], ['Белки', result.protein, 'г', '#3498DB'], ['Жиры', result.fat, 'г', '#FF9800'], ['Углеводы', result.carbs, 'г', 'var(--green)']].map(([l, v, u, c]) => (
                   <div key={l} style={{ flex: 1, textAlign: 'center', background: 'var(--bg)', borderRadius: 8, padding: '8px 4px' }}>
                     <div style={{ fontSize: 15, fontWeight: 900, color: c }}>{v}</div>
-                    <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 2 }}>{l}<br />{u}</div>
+                    <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 2 }}>{l}<br />/100г</div>
                   </div>
                 ))}
               </div>
@@ -360,7 +424,7 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
               </div>
 
               <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
-                {[['breakfast', '🌅 Завтрак'], ['lunch', '☀️ Обед'], ['dinner', '🌙 Ужин'], ['snack', '🍎 Перекус']].map(([t, l]) => (
+                {[['breakfast','🌅 Завтрак'],['lunch','☀️ Обед'],['dinner','🌙 Ужин'],['snack','🍎 Перекус']].map(([t, l]) => (
                   <button key={t} onClick={() => setMealType(t)}
                     style={{ flex: 1, padding: '7px 2px', borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: 'Nunito, sans-serif', border: 'none', background: mealType === t ? 'var(--pink)' : 'var(--bg)', color: mealType === t ? 'white' : 'var(--text-muted)' }}>
                     {l}
@@ -376,7 +440,8 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
       </div>
 
       <style>{`
-  
+        #interactive video { width: 100% !important; height: 100% !important; object-fit: cover; }
+        #interactive canvas { position: absolute; top: 0; left: 0; width: 100% !important; height: 100% !important; }
       `}</style>
     </div>
   )
