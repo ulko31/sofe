@@ -29,6 +29,11 @@ async function r(sql, args = []) {
   return db.prepare(sql).run(...args)
 }
 
+async function exec(sql) {
+  if (turso) return turso.exec(sql)
+  try { db.exec(sql) } catch(e) {}
+}
+
 // ── PUBLIC PLACES ──────────────────────────────────────────
 router.get('/places', async (req, res) => {
   try {
