@@ -35,11 +35,12 @@ export default function Home({ user, onOpenAI, onTabChange }) {
         setMeals(m.data)
       })
       .catch(() => {})
+      .finally(() => setLoading(false))
   }
 
   useEffect(() => {
+    if (!user) return
     loadData()
-    // Refresh when app comes back to foreground (new day check)
     const onFocus = () => loadData()
     window.addEventListener('focus', onFocus)
     document.addEventListener('visibilitychange', onFocus)
@@ -47,7 +48,7 @@ export default function Home({ user, onOpenAI, onTabChange }) {
       window.removeEventListener('focus', onFocus)
       document.removeEventListener('visibilitychange', onFocus)
     }
-  }, [])
+  }, [user])
 
   // Debounced food search
   useEffect(() => {
