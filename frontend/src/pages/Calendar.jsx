@@ -14,7 +14,7 @@ const TYPE_LABELS = {
   challenge: '🏆 Челлендж'
 }
 
-export default function Calendar() {
+export default function Calendar({ onTabChange, onBack }) {
   const { haptic } = useTelegram()
   const [events, setEvents] = useState([])
   const [today] = useState(new Date())
