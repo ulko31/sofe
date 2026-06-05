@@ -35,11 +35,18 @@ async function getTodayStats(userId) {
 }
 
 async function getUpcomingEvents(days = 7) {
-  const today = new Date().toISOString().split('T')[0]
-  const future = new Date(Date.now() + days * 86400000).toISOString().split('T')[0]
   try {
-    const events = await query('SELECT * FROM events WHERE date >= ? ORDER BY date ASC LIMIT 20', [today])
-    return events || []
+    // Get all events and filter in JS to handle different date formats
+    const allEvents = await query('SELECT * FROM events ORDER BY date ASC LIMIT 50')
+    const now = new Date()
+    now.setHours(0,0,0,0)
+    const filtered = (allEvents || []).filter(e => {
+      if (!e.date) return false
+      const d = new Date(e.date)
+      return !isNaN(d) && d >= now
+    })
+    console.log(`Events: found ${allEvents?.length || 0} total, ${filtered.length} upcoming`)
+    return filtered.slice(0, 10)
   }
   catch(e) { console.error('events error:', e.message); return [] }
 }
@@ -240,14 +247,11 @@ bot.onText(/\/help/, async (msg) => {
 })
 
 // ── Свободный ИИ-чат ──────────────────────────────────────
-const SKIP = ['/start', '/today', '/events', '/share', '/eat ', '/workout', '/motivate', '/help',
-  '🌸 Открыть', '📊 Стат', '🥗 Добав', '💪 Трен', '📅 Меро', '🏆 Дост']
-
 bot.on('message', async (msg) => {
   if (!msg.text) return
-  if (SKIP.some(s => msg.text.startsWith(s))) return
-  // Skip /eat without args (handled above)
-  if (msg.text === '🥗 Добавить еду') return
+  // Skip commands and keyboard buttons (handled by onText above)
+  if (msg.text.startsWith('/')) return
+  if (['📊 Статистика дня', '🥗 Добавить еду', '💪 Тренировка', '📅 Мероприятия', '🏆 Достижения', '🌸 Открыть приложение'].includes(msg.text)) return
 
   const user = await getUser(msg.from.id)
   const name = user?.name?.split(' ')[0] || msg.from.first_name || 'красотка'
