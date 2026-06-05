@@ -51,7 +51,8 @@ export default function Home({ user, onOpenAI, onTabChange }) {
       try {
         // Search Open Food Facts (3M+ products including Russian brands)
         const offRes = await fetch(
-          `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=15&lc=ru&cc=ru`
+          `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=20&lc=ru`,
+          { headers: { 'User-Agent': 'SOFE-App/1.0 (health app)' } }
         )
         const offData = await offRes.json()
         const offFoods = (offData.products || [])
