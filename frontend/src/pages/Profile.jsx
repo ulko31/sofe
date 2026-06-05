@@ -3,6 +3,7 @@ import { getProgress, updateProfile } from '../utils/api'
 import { useTelegram } from '../hooks/useTelegram'
 import Notifications from './Notifications'
 import Friends from './Friends'
+import Progress from './Progress'
 
 export default function Profile({ user, tgUser, onTabChange, onOpenAI }) {
   const { haptic } = useTelegram()
@@ -10,6 +11,7 @@ export default function Profile({ user, tgUser, onTabChange, onOpenAI }) {
   const [editing, setEditing] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
   const [showFriends, setShowFriends] = useState(false)
+  const [showProgress, setShowProgress] = useState(false)
   const [form, setForm] = useState({ name: '', calories: 2000, goal: 'health', activity: 'medium' })
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -64,6 +66,7 @@ export default function Profile({ user, tgUser, onTabChange, onOpenAI }) {
 
   if (showNotifications) return <Notifications user={user} onBack={() => setShowNotifications(false)} />
   if (showFriends) return <Friends user={user} onBack={() => setShowFriends(false)} />
+  if (showProgress) return <Progress user={user} onBack={() => setShowProgress(false)} />
 
   const menuItems = [
     { icon: 'ti-user', color: 'pink', label: 'Личные данные и цели', action: () => { haptic('light'); setEditing(true) } },
@@ -72,6 +75,7 @@ export default function Profile({ user, tgUser, onTabChange, onOpenAI }) {
     { icon: 'ti-stethoscope', color: 'pink', label: 'Консультации', badge: 'Скоро', action: () => haptic('light') },
     { icon: 'ti-bell', color: 'orange', label: 'Уведомления', action: () => { haptic('light'); setShowNotifications(true) } },
     { icon: 'ti-calendar', color: 'green', label: 'Календарь событий', action: () => { haptic('light'); onTabChange?.('calendar') } },
+    { icon: 'ti-chart-bar', color: 'green', label: 'Прогресс и статистика', action: () => { haptic('light'); setShowProgress(true) }, badge: '📊' },
     { icon: 'ti-users', color: 'pink', label: 'Подруги', action: () => { haptic('light'); setShowFriends(true) }, badge: '👯' },
     { icon: 'ti-map-pin', color: 'pink', label: 'Карта студий и кафе', action: () => { haptic('light'); onTabChange?.('map') } },
     { icon: 'ti-help-circle', color: 'orange', label: 'Поддержка', action: () => haptic('light') }
