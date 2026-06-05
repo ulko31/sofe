@@ -54,10 +54,38 @@ export default function Workouts({ user, onTabChange, onBack }) {
 
   const filtered = filter === 'Все' ? workouts : workouts.filter(w => w.type === filter)
 
+  const [showGymSelect, setShowGymSelect] = useState(false)
+  const [pendingWorkout, setPendingWorkout] = useState(null)
+
   const handleStart = (workout) => {
     haptic('medium')
     setSelectedWorkout(workout)
-    if (workout.video_url) setShowVideo(true)
+    if (workout.video_url) {
+      setShowVideo(true)
+    } else {
+      // Ask to log workout
+      setPendingWorkout(workout)
+      setShowGymSelect(true)
+    }
+  }
+
+  const handleLogAndClose = async (gymId = null) => {
+    haptic('medium')
+    setShowGymSelect(false)
+    try {
+      await api.post('/workouts/log', {
+        workout_id: pendingWorkout?.id,
+        gym_id: gymId,
+        date: new Date().toISOString().split('T')[0]
+      })
+      if (gymId) {
+        setGyms(g => g.map(x => x.id === gymId
+          ? { ...x, used_sessions: (x.used_sessions || 0) + 1 }
+          : x))
+      }
+      haptic('medium')
+    } catch(e) { console.error(e) }
+    setPendingWorkout(null)
   }
 
   const handleAddGym = async () => {
@@ -205,12 +233,51 @@ export default function Workouts({ user, onTabChange, onBack }) {
         )}
       </div>
 
+      {/* Gym select modal */}
+      {showGymSelect && pendingWorkout && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'flex-end' }}>
+          <div style={{ background: 'var(--white)', borderRadius: '20px 20px 0 0', padding: 20, width: '100%', paddingBottom: 'max(20px, env(safe-area-inset-bottom))' }}>
+            <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 4 }}>✅ Отметить тренировку</div>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>{pendingWorkout.name}</div>
+            {gyms.length > 0 && (
+              <>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 10 }}>Списать занятие с абонемента:</div>
+                {gyms.map(g => (
+                  <div key={g.id} onClick={() => handleLogAndClose(g.id)}
+                    style={{ padding: '12px 14px', borderRadius: 12, background: 'var(--bg)', marginBottom: 8, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontWeight: 800, fontSize: 14 }}>{g.name}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Осталось: {g.total_sessions - (g.used_sessions || 0)} из {g.total_sessions}</div>
+                    </div>
+                    <i className="ti ti-chevron-right" style={{ color: 'var(--pink)' }} />
+                  </div>
+                ))}
+                <div style={{ height: 1, background: 'var(--border)', margin: '12px 0' }} />
+              </>
+            )}
+            <button className="btn-outline" style={{ width: '100%', marginBottom: 8 }} onClick={() => handleLogAndClose(null)}>
+              Отметить без абонемента
+            </button>
+            <button onClick={() => { setShowGymSelect(false); setPendingWorkout(null) }}
+              style={{ width: '100%', padding: 12, borderRadius: 12, background: 'none', border: 'none', color: 'var(--text-muted)', fontFamily: 'Nunito, sans-serif', fontSize: 14, cursor: 'pointer' }}>
+              Отмена
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Video player modal */}
       {showVideo && selectedWorkout?.video_url && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 100, display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '48px 16px 12px' }}>
             <div style={{ color: 'white', fontWeight: 800, fontSize: 16 }}>{selectedWorkout.name}</div>
             <button onClick={() => setShowVideo(false)} style={{ color: 'white', fontSize: 28, background: 'none', border: 'none', cursor: 'pointer', lineHeight: 1 }}>×</button>
+          </div>
+          <div style={{ display: 'flex', gap: 10, padding: '0 16px 12px' }}>
+            <button className="btn-primary" style={{ flex: 1 }} onClick={() => { setShowVideo(false); setPendingWorkout(selectedWorkout); setShowGymSelect(true) }}>
+              ✅ Отметить как выполненную
+            </button>
+            <button className="btn-outline" onClick={() => setShowVideo(false)}>Закрыть</button>
           </div>
           <div style={{ flex: 1, padding: '0 0 32px' }}>
             <iframe
