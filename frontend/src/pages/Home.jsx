@@ -217,13 +217,13 @@ export default function Home({ user, onOpenAI, onTabChange }) {
       {/* Trackers */}
       <div>
         {/* AI Assistant quick access */}
-        <div onClick={() => onOpenAI?.()} style={{ background: 'var(--pink)', borderRadius: 'var(--radius)', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', marginBottom: 4 }}>
+        <div onClick={() => onOpenAI?.()} style={{ background: '#4ade80', borderRadius: 'var(--radius)', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', marginBottom: 4 }}>
           <div style={{ width: 44, height: 44, flexShrink: 0, background: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <img src="/mascot.svg" alt="SOFE" style={{ width: '85%', height: '85%', objectFit: 'contain' }} />
             </div>
           <div style={{ flex: 1 }}>
-            <div style={{ color: 'white', fontWeight: 800, fontSize: 14 }}>SOFE ИИ-ассистент</div>
-            <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 2 }}>Спроси про питание или тренировки</div>
+            <div style={{ color: '#14532d', fontWeight: 800, fontSize: 14 }}>SOFE ИИ-ассистент</div>
+            <div style={{ color: '#166534', fontSize: 12, marginTop: 2 }}>Спроси про питание или тренировки</div>
           </div>
           <i className="ti ti-chevron-right" style={{ color: 'rgba(255,255,255,0.6)', fontSize: 18 }} />
         </div>
