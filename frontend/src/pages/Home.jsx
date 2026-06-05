@@ -47,22 +47,50 @@ export default function Home({ user, onOpenAI, onTabChange }) {
     const localResults = searchLocalFoods(query)
     setSearchResults(localResults)
     setSearching(true)
-    // Then supplement with backend results
     searchTimeout.current = setTimeout(async () => {
       try {
-        const res = await searchFoods(query)
-        if (res.data?.length > 0) {
-          // Merge: backend results first, then local ones not already in backend
-          const backendNames = new Set(res.data.map(f => f.name.toLowerCase()))
-          const uniqueLocal = localResults.filter(f => !backendNames.has(f.name.toLowerCase()))
-          setSearchResults([...res.data, ...uniqueLocal])
-        }
-      } catch (e) {
+        // Search Open Food Facts (3M+ products including Russian brands)
+        const offRes = await fetch(
+          `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=15&lc=ru&cc=ru`
+        )
+        const offData = await offRes.json()
+        const offFoods = (offData.products || [])
+          .filter(p => p.product_name && p.nutriments?.['energy-kcal_100g'])
+          .map(p => ({
+            id: 'off_' + p.code,
+            name: p.product_name_ru || p.product_name,
+            brand: p.brands || '',
+            calories: Math.round(p.nutriments['energy-kcal_100g'] || 0),
+            protein: Math.round((p.nutriments.proteins_100g || 0) * 10) / 10,
+            fat: Math.round((p.nutriments.fat_100g || 0) * 10) / 10,
+            carbs: Math.round((p.nutriments.carbohydrates_100g || 0) * 10) / 10,
+            unit: '100г', unit_weight: 100
+          }))
+          .filter(f => f.calories > 0)
+
+        // Also search backend
+        let backendFoods = []
+        try {
+          const res = await searchFoods(query)
+          backendFoods = res.data || []
+        } catch(e) {}
+
+        // Merge: backend first, then OFF, then local — deduplicate by name
+        const seen = new Set()
+        const merged = [...backendFoods, ...offFoods, ...localResults].filter(f => {
+          const key = f.name?.toLowerCase()
+          if (!key || seen.has(key)) return false
+          seen.add(key)
+          return true
+        })
+        setSearchResults(merged.slice(0, 30))
+      } catch(e) {
         // Keep local results on error
+        setSearching(false)
       } finally {
         setSearching(false)
       }
-    }, 500)
+    }, 400)
   }, [query])
 
   const handleSelectFood = (food) => {
