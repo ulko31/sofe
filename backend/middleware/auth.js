@@ -1,55 +1,44 @@
+require('dotenv').config()
 const crypto = require('crypto')
-const db = require('../db/init')
 
-function validateTelegramData(initData, botToken) {
+let turso
+try {
+  if (process.env.TURSO_URL) turso = require('../db/turso')
+} catch(e) {}
+
+module.exports = async function auth(req, res, next) {
   try {
+    const initData = req.headers['x-telegram-init-data'] || ''
+    if (!initData) return res.status(401).json({ error: 'No auth' })
+
     const params = new URLSearchParams(initData)
     const hash = params.get('hash')
     params.delete('hash')
+    const dataCheckString = [...params.entries()].sort(([a],[b]) => a.localeCompare(b)).map(([k,v]) => `${k}=${v}`).join('\n')
+    const secret = crypto.createHmac('sha256', 'WebAppData').update(process.env.BOT_TOKEN || '').digest()
+    const expectedHash = crypto.createHmac('sha256', secret).update(dataCheckString).digest('hex')
 
-    const dataCheckString = Array.from(params.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([k, v]) => `${k}=${v}`)
-      .join('\n')
+    const userStr = params.get('user')
+    if (!userStr) return res.status(401).json({ error: 'No user' })
+    const tgUser = JSON.parse(userStr)
 
-    const secretKey = crypto.createHmac('sha256', 'WebAppData').update(botToken).digest()
-    const expectedHash = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex')
+    if (!turso) return res.status(500).json({ error: 'DB not configured' })
 
-    return hash === expectedHash
-  } catch {
-    return false
+    // Find or create user
+    let user = await turso.queryOne('SELECT * FROM users WHERE telegram_id = ?', [String(tgUser.id)])
+    if (!user) {
+      const result = await turso.run(
+        'INSERT INTO users (telegram_id, name, username) VALUES (?, ?, ?)',
+        [String(tgUser.id), tgUser.first_name || '', tgUser.username || '']
+      )
+      user = await turso.queryOne('SELECT * FROM users WHERE id = ?', [result.lastInsertRowid])
+    }
+
+    req.user = user
+    req.tgUser = tgUser
+    next()
+  } catch(e) {
+    console.error('Auth error:', e.message)
+    res.status(401).json({ error: 'Auth failed' })
   }
-}
-
-function getOrCreateUser(telegramUser) {
-  const existing = db.prepare('SELECT * FROM users WHERE telegram_id = ?').get(String(telegramUser.id))
-  if (existing) return existing
-
-  const result = db.prepare(
-    'INSERT INTO users (telegram_id, name, username) VALUES (?, ?, ?)'
-  ).run(String(telegramUser.id), telegramUser.first_name, telegramUser.username || null)
-
-  return db.prepare('SELECT * FROM users WHERE id = ?').get(result.lastInsertRowid)
-}
-
-module.exports = function authMiddleware(req, res, next) {
-  // Dev mode — skip auth if no token
-  if (process.env.NODE_ENV === 'development' && !req.headers['x-telegram-init-data']) {
-    req.user = db.prepare('SELECT * FROM users LIMIT 1').get() || { id: 1, telegram_id: 'dev', name: 'Dev User' }
-    return next()
-  }
-
-  const initData = req.headers['x-telegram-init-data']
-  if (!initData) return res.status(401).json({ error: 'No Telegram auth' })
-
-  const isValid = validateTelegramData(initData, process.env.BOT_TOKEN)
-  if (!isValid) return res.status(401).json({ error: 'Invalid Telegram auth' })
-
-  const params = new URLSearchParams(initData)
-  const userStr = params.get('user')
-  if (!userStr) return res.status(401).json({ error: 'No user data' })
-
-  const telegramUser = JSON.parse(userStr)
-  req.user = getOrCreateUser(telegramUser)
-  next()
 }
