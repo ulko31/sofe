@@ -47,7 +47,6 @@ export default function Home({ user, onOpenAI, onTabChange }) {
       window.removeEventListener('focus', onFocus)
       document.removeEventListener('visibilitychange', onFocus)
     }
-      .finally(() => setLoading(false))
   }, [])
 
   // Debounced food search
