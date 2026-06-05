@@ -52,17 +52,26 @@ async function getUpcomingEvents(days = 7) {
 }
 
 async function askGroq(system, userMsg) {
-  if (!GROQ_TOKEN) return null
+  if (!GROQ_TOKEN) {
+    console.error('❌ GROQ_TOKEN not set')
+    return null
+  }
   try {
+    console.log('🔄 Groq request to:', GROQ_URL, 'model:', MODEL)
     const res = await fetch(GROQ_URL, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${GROQ_TOKEN}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: MODEL, messages: [{ role: 'system', content: system }, { role: 'user', content: userMsg }], max_tokens: 400, temperature: 0.7 })
     })
-    if (!res.ok) return null
+    console.log('📡 Groq status:', res.status)
     const data = await res.json()
+    console.log('📦 Groq response:', JSON.stringify(data).substring(0, 200))
+    if (!res.ok) return null
     return data.choices?.[0]?.message?.content?.trim() || null
-  } catch(e) { return null }
+  } catch(e) {
+    console.error('❌ Groq fetch error:', e.message)
+    return null
+  }
 }
 
 async function send(chatId, text, inlineKeyboard = null) {
@@ -390,3 +399,4 @@ bot.on('polling_error', err => {
 })
 
 console.log('🤖 SOFE Bot started')
+console.log('🔑 GROQ_TOKEN:', GROQ_TOKEN ? 'SET (' + GROQ_TOKEN.substring(0, 8) + '...)' : 'NOT SET')
