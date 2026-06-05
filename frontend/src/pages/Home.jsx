@@ -289,10 +289,16 @@ export default function Home({ user, onOpenAI, onTabChange }) {
                 <div style={{ width: 36, height: 36, borderRadius: 8, background: t.color === 'pink' ? 'var(--pink-light)' : 'var(--green-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
                   <i className={`ti ${t.icon}`} style={{ fontSize: 18, color: t.color === 'pink' ? 'var(--pink)' : 'var(--green)' }} />
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                  {t.label} {t.hint && <span style={{ color: 'var(--pink)', fontSize: 10 }}>{t.hint}</span>}
-                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t.label}</div>
                 <div style={{ fontSize: 17, fontWeight: 900, marginTop: 2 }}>{t.val}</div>
+                {t.key === 'water' && (
+                  <div style={{ display: 'flex', gap: 6, marginTop: 6 }} onClick={e => e.stopPropagation()}>
+                    <button onClick={handleWaterRemove}
+                      style={{ flex: 1, padding: '4px', borderRadius: 6, background: '#f0f0f0', border: 'none', fontSize: 14, fontWeight: 900, cursor: 'pointer', color: 'var(--text-muted)' }}>−</button>
+                    <button onClick={e => { e.stopPropagation(); handleWaterAdd() }}
+                      style={{ flex: 1, padding: '4px', borderRadius: 6, background: 'var(--pink-light)', border: 'none', fontSize: 14, fontWeight: 900, cursor: 'pointer', color: 'var(--pink)' }}>+</button>
+                  </div>
+                )}
                 <div style={{ height: 4, background: '#f0f0f0', borderRadius: 2, marginTop: 8 }}>
                   <div style={{ height: '100%', borderRadius: 2, background: t.color === 'pink' ? 'var(--pink)' : 'var(--green)', width: `${pct}%` }} />
                 </div>
