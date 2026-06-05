@@ -26,21 +26,26 @@ export default function App() {
   const [needsOnboarding, setNeedsOnboarding] = useState(false)
   const [pendingFriendToken, setPendingFriendToken] = useState(null)
 
-  // Load user
+  // Load user - wait for Telegram to be ready
   useEffect(() => {
-    if (!user) return
-    getMe()
-      .then(r => {
-        setAppUser(r.data.user)
-        setNeedsOnboarding(!r.data.user.onboarded)
-        setLoading(false)
-      })
-      .catch(() => { setNeedsOnboarding(true); setLoading(false) })
-  }, [user])
+    const tg = window.Telegram?.WebApp
+    if (!tg) { setLoading(false); return }
 
-  useEffect(() => {
-    if (!window.Telegram?.WebApp?.initData) setLoading(false)
-  }, [])
+    // Telegram WebApp ready event
+    const doLoad = () => {
+      if (!tg.initData) { setLoading(false); return }
+      getMe()
+        .then(r => {
+          setAppUser(r.data.user)
+          setNeedsOnboarding(!r.data.user.onboarded)
+          setLoading(false)
+        })
+        .catch(() => { setNeedsOnboarding(true); setLoading(false) })
+    }
+
+    // Give Telegram 500ms to initialize
+    setTimeout(doLoad, 500)
+  }, [user])
 
   // Check friend invite on start
   useEffect(() => {
