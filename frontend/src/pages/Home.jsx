@@ -23,16 +23,30 @@ export default function Home({ user, onOpenAI, onTabChange }) {
   const [weight, setWeight] = useState('100')
   const searchTimeout = useRef(null)
 
-  const today = new Date().toISOString().split('T')[0]
+  const getToday = () => new Date().toISOString().split('T')[0]
+  const today = getToday()
 
-  useEffect(() => {
-    Promise.all([getTodayStats(), getTrackers(today), getMeals(today)])
+  const loadData = () => {
+    const d = getToday()
+    Promise.all([getTodayStats(), getTrackers(d), getMeals(d)])
       .then(([s, t, m]) => {
         setStats(s.data)
         setTrackers(t.data)
         setMeals(m.data)
       })
       .catch(() => {})
+  }
+
+  useEffect(() => {
+    loadData()
+    // Refresh when app comes back to foreground (new day check)
+    const onFocus = () => loadData()
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onFocus)
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onFocus)
+    }
       .finally(() => setLoading(false))
   }, [])
 
