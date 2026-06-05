@@ -41,6 +41,7 @@ export default function Workouts({ user, onTabChange, onBack }) {
   const [showAddGym, setShowAddGym] = useState(false)
   const [newGymName, setNewGymName] = useState('')
   const [newGymSessions, setNewGymSessions] = useState('8')
+  const [editingGym, setEditingGym] = useState(null)
 
   useEffect(() => {
     Promise.all([
@@ -97,6 +98,16 @@ export default function Workouts({ user, onTabChange, onBack }) {
       setNewGymName('')
       setNewGymSessions('8')
       setShowAddGym(false)
+    } catch(e) {}
+  }
+
+  const handleEditGym = async (gym, newTotal) => {
+    const total = parseInt(newTotal)
+    if (isNaN(total) || total < 1) return
+    try {
+      const res = await api.put(`/workouts/gyms/${gym.id}`, { total_sessions: total })
+      setGyms(g => g.map(x => x.id === gym.id ? { ...x, total_sessions: total } : x))
+      setEditingGym(null)
     } catch(e) {}
   }
 
@@ -273,11 +284,14 @@ export default function Workouts({ user, onTabChange, onBack }) {
             <div style={{ color: 'white', fontWeight: 800, fontSize: 16 }}>{selectedWorkout.name}</div>
             <button onClick={() => setShowVideo(false)} style={{ color: 'white', fontSize: 28, background: 'none', border: 'none', cursor: 'pointer', lineHeight: 1 }}>×</button>
           </div>
-          <div style={{ display: 'flex', gap: 10, padding: '0 16px 12px' }}>
+          <div style={{ padding: '0 16px 12px', display: 'flex', gap: 10, alignItems: 'center' }}>
+            <button onClick={() => setShowVideo(false)}
+              style={{ background: 'none', border: 'none', color: 'white', fontSize: 22, cursor: 'pointer', padding: '8px' }}>
+              ←
+            </button>
             <button className="btn-primary" style={{ flex: 1 }} onClick={() => { setShowVideo(false); setPendingWorkout(selectedWorkout); setShowGymSelect(true) }}>
               ✅ Отметить как выполненную
             </button>
-            <button className="btn-outline" onClick={() => setShowVideo(false)}>Закрыть</button>
           </div>
           <div style={{ flex: 1, padding: '0 0 32px' }}>
             <iframe
