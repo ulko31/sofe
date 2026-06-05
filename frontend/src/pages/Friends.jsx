@@ -17,6 +17,7 @@ export default function Friends({ user, onBack }) {
   const [loading, setLoading] = useState(true)
   const [inviteLink, setInviteLink] = useState(null)
   const [shareLocation, setShareLocation] = useState(false)
+  const [myLocation, setMyLocation] = useState(null)
   const [selectedFriend, setSelectedFriend] = useState(null)
   const [events, setEvents] = useState([])
 
@@ -24,7 +25,26 @@ export default function Friends({ user, onBack }) {
     loadData()
     loadEvents()
     checkInviteAction()
+    loadMyLocation()
   }, [])
+
+  const loadMyLocation = async () => {
+    try {
+      const res = await api.get('/friends/my-location')
+      if (res.data?.share_location) {
+        setShareLocation(true)
+        setMyLocation({ lat: res.data.lat, lng: res.data.lng })
+        // Re-send current position to keep it fresh
+        navigator.geolocation?.getCurrentPosition(pos => {
+          api.post('/friends/location', {
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            share: true
+          }).catch(() => {})
+        }, () => {})
+      }
+    } catch(e) {}
+  }
 
   const loadData = async () => {
     setLoading(true)
@@ -150,17 +170,28 @@ export default function Friends({ user, onBack }) {
 
   const handleUpdateLocation = async () => {
     haptic('light')
-    navigator.geolocation?.getCurrentPosition(async (pos) => {
+    if (shareLocation) {
+      // Turn off
       try {
-        await api.post('/friends/location', {
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          share: !shareLocation
-        })
-        setShareLocation(s => !s)
+        await api.post('/friends/location', { lat: 0, lng: 0, share: false })
+        setShareLocation(false)
         haptic('medium')
       } catch(e) {}
-    }, () => alert('Разреши доступ к геолокации в настройках'))
+    } else {
+      // Turn on - get position first
+      navigator.geolocation?.getCurrentPosition(async (pos) => {
+        try {
+          await api.post('/friends/location', {
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            share: true
+          })
+          setShareLocation(true)
+          setMyLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+          haptic('medium')
+        } catch(e) {}
+      }, () => alert('Разреши доступ к геолокации в настройках'))
+    }
   }
 
   const timeAgo = (dateStr) => {
