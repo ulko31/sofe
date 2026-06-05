@@ -39,7 +39,13 @@ export default api
 export const getMe = () => api.get('/user/me')
 export const updateProfile = (data) => api.put('/user/profile', data)
 
-export const getTodayStats = () => api.get('/nutrition/today')
+export const getTodayStats = () => {
+  const date = new Date()
+  const y = date.getFullYear()
+  const m = String(date.getMonth()+1).padStart(2,'0')
+  const d = String(date.getDate()).padStart(2,'0')
+  return api.get('/nutrition/today', { params: { date: `${y}-${m}-${d}` } })
+}
 export const getMeals = (date) => api.get('/nutrition/meals', { params: { date } })
 export const addMeal = (data) => api.post('/nutrition/meals', data)
 export const deleteMeal = (id) => api.delete(`/nutrition/meals/${id}`)
