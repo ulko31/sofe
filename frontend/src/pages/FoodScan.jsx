@@ -10,6 +10,8 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
   const [mealType, setMealType] = useState('snack')
+  const [editName, setEditName] = useState('')
+  const [editCalories, setEditCalories] = useState('')
   const [weight, setWeight] = useState('100')
   const [manualBarcode, setManualBarcode] = useState('')
   const videoContainerRef = useRef(null)
@@ -30,7 +32,9 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
 
   const stopQuagga = () => {
     if (quaggaRef.current) {
-      try { quaggaRef.current.stop() } catch(e) {}
+      try {
+        if (typeof quaggaRef.current.stop === 'function') quaggaRef.current.stop().catch(() => {})
+      } catch(e) {}
       quaggaRef.current = null
     }
     detectedRef.current = false
@@ -46,7 +50,7 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
     detectedRef.current = false
   }
 
-  // ── BARCODE via Quagga ────────────────────────────────────
+  // ── BARCODE via html5-qrcode ───────────────────────────────
   const startBarcodeScanner = async () => {
     setMode('barcode')
     setScanning(true)
@@ -54,11 +58,11 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
     setResult(null)
     detectedRef.current = false
 
-    if (!window.Quagga) {
+    if (!window.Html5Qrcode) {
       try {
         await new Promise((res, rej) => {
           const s = document.createElement('script')
-          s.src = 'https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js'
+          s.src = 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js'
           s.onload = res
           s.onerror = rej
           document.head.appendChild(s)
@@ -70,87 +74,29 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
       }
     }
 
-    // Wait for DOM
-    await new Promise(r => setTimeout(r, 100))
-    const container = videoContainerRef.current
-    if (!container) { setScanning(false); return }
+    await new Promise(r => setTimeout(r, 200))
 
     try {
-      await new Promise((resolve, reject) => {
-        window.Quagga.init({
-          inputStream: {
-            name: 'Live',
-            type: 'LiveStream',
-            target: container,
-            constraints: {
-              facingMode: { exact: 'environment' },
-              width: { ideal: 1280 },
-              height: { ideal: 720 },
-              focusMode: 'continuous',
-              advanced: [{ focusMode: 'continuous' }]
-            },
-            area: {
-              top: '20%', right: '10%',
-              left: '10%', bottom: '20%'
-            }
-          },
-          locator: {
-            patchSize: 'medium',
-            halfSample: true
-          },
-          numOfWorkers: 2,
-          frequency: 10,
-          decoder: {
-            readers: [
-              'ean_reader',
-              'ean_8_reader',
-              'upc_reader',
-              'upc_e_reader',
-              'code_128_reader'
-            ]
-          },
-          locate: true
-        }, err => {
-          if (err) { reject(err); return }
-          resolve()
-        })
-      })
+      const scanner = new window.Html5Qrcode('barcode-scanner-container')
+      quaggaRef.current = scanner
 
-      quaggaRef.current = window.Quagga
-      window.Quagga.start()
-
-      window.Quagga.onDetected(async data => {
-        if (detectedRef.current) return
-        const code = data.codeResult.code
-        if (!code || code.length < 4) return
-        detectedRef.current = true
-        haptic('medium')
-        stopQuagga()
-        setScanning(false)
-        await lookupBarcode(code)
-      })
-
-      window.Quagga.onProcessed(result => {
-        const drawingCtx = window.Quagga.canvas.ctx.overlay
-        const drawingCanvas = window.Quagga.canvas.dom.overlay
-        if (!drawingCtx || !drawingCanvas) return
-        drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height)
-        if (result?.boxes) {
-          result.boxes.filter(b => b !== result.box).forEach(box => {
-            window.Quagga.ImageDebug.drawPath(box, { x: 0, y: 1 }, drawingCtx, { color: 'green', lineWidth: 2 })
-          })
-        }
-        if (result?.box) {
-          window.Quagga.ImageDebug.drawPath(result.box, { x: 0, y: 1 }, drawingCtx, { color: '#00F', lineWidth: 2 })
-        }
-        if (result?.codeResult?.code) {
-          window.Quagga.ImageDebug.drawPath(result.line, { x: 'x', y: 'y' }, drawingCtx, { color: 'red', lineWidth: 3 })
-        }
-      })
-
+      await scanner.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: { width: 280, height: 100 }, aspectRatio: 1.7 },
+        async (decodedText) => {
+          if (detectedRef.current) return
+          detectedRef.current = true
+          haptic('medium')
+          await scanner.stop().catch(() => {})
+          quaggaRef.current = null
+          setScanning(false)
+          await lookupBarcode(decodedText)
+        },
+        () => {}
+      )
     } catch(e) {
-      console.error('Quagga error:', e)
-      setError('Не удалось запустить камеру. Попробуй ввести штрихкод вручную.')
+      console.error('Scanner error:', e)
+      setError('Не удалось запустить камеру. Введи штрихкод вручную.')
       setScanning(false)
     }
   }
@@ -233,7 +179,7 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
       if (!jsonMatch) throw new Error('no_json')
       const parsed = JSON.parse(jsonMatch[0])
 
-      setResult({
+      const recResult = {
         source: 'photo',
         name: parsed.name || 'Блюдо',
         confidence: 90,
@@ -243,7 +189,10 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
         carbs: Math.round((parsed.carbs || 0) * 10) / 10,
         unit_weight: 100,
         imageFile
-      })
+      }
+      setResult(recResult)
+      setEditName(recResult.name)
+      setEditCalories(String(recResult.calories))
     } catch(e) {
       console.error('Photo error:', e.message)
       if (e.message === 'no_token') setError('Токен Groq не настроен.')
@@ -281,7 +230,7 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
     const today = new Date().toISOString().split('T')[0]
     try {
       await addMeal({
-        name: result.name,
+        name: result.source === 'photo' ? (editName || result.name) : result.name,
         calories: Math.round(result.calories * ratio),
         protein: Math.round(result.protein * ratio * 10) / 10,
         fat: Math.round(result.fat * ratio * 10) / 10,
@@ -364,8 +313,8 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
           <div>
             <div style={{ position: 'relative', borderRadius: 12, overflow: 'hidden', background: '#000', width: '100%', aspectRatio: '16/9' }}>
               <div
-                ref={videoContainerRef}
-                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
+                id="barcode-scanner-container"
+                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'hidden' }}
               />
               {/* Scan frame overlay */}
               <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
@@ -416,9 +365,17 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
                   <img src={result.imageFile || result.image} alt="" style={{ width: 70, height: 70, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }} />
                 )}
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 16, fontWeight: 900 }}>{result.name}</div>
+                  {result.source === 'photo' ? (
+                    <input
+                      value={editName}
+                      onChange={e => setEditName(e.target.value)}
+                      style={{ fontSize: 15, fontWeight: 800, border: 'none', borderBottom: '1.5px solid var(--pink-mid)', background: 'transparent', width: '100%', padding: '2px 0', fontFamily: 'Nunito, sans-serif' }}
+                    />
+                  ) : (
+                    <div style={{ fontSize: 16, fontWeight: 900 }}>{result.name}</div>
+                  )}
                   {result.brand && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{result.brand}</div>}
-                  {result.source === 'photo' && <div style={{ fontSize: 11, color: 'var(--green)', fontWeight: 700, marginTop: 4 }}>🤖 Распознано ИИ</div>}
+                  {result.source === 'photo' && <div style={{ fontSize: 11, color: 'var(--green)', fontWeight: 700, marginTop: 4 }}>🤖 Распознано ИИ · можно исправить</div>}
                   {result.barcode && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>📦 {result.barcode}</div>}
                 </div>
               </div>
