@@ -22,6 +22,9 @@ export default function Workouts() {
   const [filter, setFilter] = useState('Все')
   const [workouts, setWorkouts] = useState([])
   const [subs, setSubs] = useState([])
+  const [showAddGym, setShowAddGym] = useState(false)
+  const [newGymName, setNewGymName] = useState('')
+  const [newGymSessions, setNewGymSessions] = useState('8')
   const [loading, setLoading] = useState(true)
   const [selectedWorkout, setSelectedWorkout] = useState(null)
   const [showVideo, setShowVideo] = useState(false)
@@ -33,18 +36,48 @@ export default function Workouts() {
         setSubs(s.data)
       })
       .catch(() => {
-        setWorkouts([
-          { id: 1, name: 'FIT-тренировка', type: 'FIT', duration: 45, level: 'Интенсивный', format: 'Онлайн', video_url: '', instructor: '' },
-          { id: 2, name: 'Stretching', type: 'Stretching', duration: 30, level: 'Лёгкий', format: 'Онлайн', video_url: '', instructor: '' },
-          { id: 3, name: 'Fit ball', type: 'Fit ball', duration: 40, level: 'Средний', format: 'Студия', video_url: '', instructor: '' }
-        ])
-        setSubs([
-          { id: 1, studio: 'ELASTICA', total: 8, used: 5 },
-          { id: 2, studio: 'ForMe', total: 16, used: 10 }
-        ])
+        setWorkouts([])
+        setSubs([])
       })
       .finally(() => setLoading(false))
   }, [])
+
+  const handleAddGym = async () => {
+    if (!newGymName.trim()) return
+    haptic('medium')
+    try {
+      const res = await api.post('/workouts/gyms', { name: newGymName, total_sessions: parseInt(newGymSessions) || 8 })
+      setSubs(s => [...s, res.data])
+      setNewGymName('')
+      setNewGymSessions('8')
+      setShowAddGym(false)
+    } catch(e) {}
+  }
+
+  const handleMarkVisit = async (gym) => {
+    haptic('light')
+    if (gym.used_sessions >= gym.total_sessions) { alert('Все занятия использованы!'); return }
+    try {
+      const res = await api.put(`/workouts/gyms/${gym.id}`, { used_sessions: (gym.used_sessions || 0) + 1 })
+      setSubs(s => s.map(g => g.id === gym.id ? res.data : g))
+    } catch(e) {}
+  }
+
+  const handleDeleteGym = async (gymId) => {
+    if (!confirm('Удалить зал?')) return
+    haptic('light')
+    try {
+      await api.delete(`/workouts/gyms/${gymId}`)
+      setSubs(s => s.filter(g => g.id !== gymId))
+    } catch(e) {}
+  }
+
+  const handleLogWorkout = async (workout) => {
+    haptic('medium')
+    try {
+      await api.post('/workouts/log', { workout_id: workout.id, date: new Date().toISOString().split('T')[0] })
+    } catch(e) {}
+  }
 
   const filtered = filter === 'Все' ? workouts : workouts.filter(w => w.type === filter)
 
@@ -114,7 +147,10 @@ export default function Workouts() {
 
       {/* Subscriptions */}
       <div>
-        <div className="section-header"><h3>Абонементы в студии</h3></div>
+        <div className="section-header">
+          <h3>Мои залы и студии</h3>
+          <a onClick={() => setShowAddGym(true)} style={{ cursor: 'pointer' }}>+ Добавить</a>
+        </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           {subs.map(s => {
             const remaining = s.total - s.used
