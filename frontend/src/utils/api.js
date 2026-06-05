@@ -28,7 +28,7 @@ export const deleteMeal = (id) => api.delete(`/nutrition/meals/${id}`)
 export const searchFoods = (q) => api.get('/foods/search', { params: { q } })
 
 export const getTrackers = (date) => api.get('/trackers', { params: { date } })
-export const updateTracker = (type, value) => api.post('/trackers', { type, value })
+export const updateTracker = (type, value) => api.put('/trackers', { [type]: value })
 
 export const getWorkouts = () => api.get('/workouts')
 export const getMyWorkouts = () => api.get('/workouts/my')
