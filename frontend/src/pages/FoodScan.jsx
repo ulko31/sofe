@@ -105,23 +105,48 @@ export default function FoodScan({ onBack, onMealAdded }) {
   }
 
   const lookupBarcode = async (barcode) => {
+    const code = barcode.replace(/[^0-9]/g, '')
+    if (!code) return
     setProcessing(true); setError(null)
+
+    // Try multiple code variants
+    const variants = [code]
+    if (code.length === 12) variants.push('4' + code, '0' + code)
+    if (code.length === 13 && code[0] === '4') variants.push(code.slice(1))
+
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || '/api'
-      const r = await fetch(`${apiUrl}/barcode/${barcode.replace(/[^0-9]/g, '')}`)
-      const data = await r.json()
-      
-      if (!data.found) {
-        setMode('barcode_name_search')
-        setBarcodeCode(barcode)
-        setProcessing(false); return
+      for (const v of variants) {
+        const r = await fetch(`https://world.openfoodfacts.org/api/v0/product/${v}.json`)
+        const data = await r.json()
+        if (data.status === 1 && data.product) {
+          const p = data.product
+          const n = p.nutriments || {}
+          const cal = Math.round(n['energy-kcal_100g'] || 0)
+          if (cal > 0) {
+            const res = {
+              source: 'barcode', barcode: v,
+              name: p.product_name_ru || p.product_name || 'Продукт',
+              brand: (p.brands || '').split(',')[0].trim(),
+              calories: cal,
+              protein: Math.round((n.proteins_100g || 0) * 10) / 10,
+              fat: Math.round((n.fat_100g || 0) * 10) / 10,
+              carbs: Math.round((n.carbohydrates_100g || 0) * 10) / 10,
+              image: p.image_front_small_url || null,
+              unit_weight: 100
+            }
+            setResult(res); setEditName(res.name); setEditCal(res.calories)
+            setProcessing(false); return
+          }
+        }
       }
-      
-      setResult({ source: 'barcode', ...data, unit_weight: 100 })
-      setEditName(data.name)
-      setEditCal(data.calories)
-    } catch(e) { setError('Ошибка сети. Попробуй ввести название вручную.') }
-    finally { setProcessing(false) }
+      // Not found — switch to name search
+      setBarcodeCode(code)
+      setMode('barcode_name_search')
+    } catch(e) {
+      setBarcodeCode(code)
+      setMode('barcode_name_search')
+    }
+    setProcessing(false)
   }
 
   // ── PHOTO ─────────────────────────────────────────────────
@@ -189,12 +214,24 @@ export default function FoodScan({ onBack, onMealAdded }) {
     if (!q || q.length < 2) return
     setNameSearching(true)
     try {
-      // Try backend proxy first
-      const apiUrl = import.meta.env.VITE_API_URL || '/api'
-      const r = await fetch(`${apiUrl}/food-search?q=${encodeURIComponent(q)}`)
-      const results = await r.json()
-      if (Array.isArray(results) && results.length > 0) {
-        setNameResults(results)
+      // Search OFF directly from browser (no CORS issues for browsers)
+      const r = await fetch(
+        `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=20&fields=product_name,product_name_ru,brands,nutriments,code`
+      )
+      const data = await r.json()
+      const products = (data.products || [])
+        .filter(p => p.product_name && p.nutriments?.['energy-kcal_100g'] > 0)
+        .map(p => ({
+          id: 'off_' + p.code,
+          name: (p.product_name_ru || p.product_name || '').trim(),
+          brand: (p.brands || '').split(',')[0].trim(),
+          calories: Math.round(p.nutriments['energy-kcal_100g'] || 0),
+          protein: Math.round((p.nutriments.proteins_100g || 0) * 10) / 10,
+          fat: Math.round((p.nutriments.fat_100g || 0) * 10) / 10,
+          carbs: Math.round((p.nutriments.carbohydrates_100g || 0) * 10) / 10,
+        }))
+      if (products.length > 0) {
+        setNameResults(products.slice(0, 20))
         setNameSearching(false)
         return
       }
