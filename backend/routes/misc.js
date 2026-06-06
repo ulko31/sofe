@@ -225,6 +225,29 @@ router.get('/food-search', async (req, res) => {
   }
 })
 
+// ── LOCAL BARCODE DATABASE (popular Russian products) ──────
+const LOCAL_BARCODES = {
+  '4600842024383': { name: 'Молоко Простоквашино 3.2%', brand: 'Простоквашино', calories: 60, protein: 2.8, fat: 3.2, carbs: 4.7 },
+  '4601573017777': { name: 'Кефир Простоквашино 3.2%', brand: 'Простоквашино', calories: 59, protein: 2.9, fat: 3.2, carbs: 4.0 },
+  '4607134960400': { name: 'Творог Простоквашино 5%', brand: 'Простоквашино', calories: 121, protein: 17.0, fat: 5.0, carbs: 1.8 },
+  '4607038058874': { name: 'Йогурт Активиа натуральный', brand: 'Activia', calories: 66, protein: 4.2, fat: 2.9, carbs: 5.8 },
+  '4607038050359': { name: 'Творог Danone 5%', brand: 'Danone', calories: 121, protein: 17.0, fat: 5.0, carbs: 1.8 },
+  '7622210951557': { name: 'Milka молочный шоколад', brand: 'Milka', calories: 535, protein: 6.9, fat: 30.1, carbs: 59.5 },
+  '7622210100337': { name: 'Milka Oreo', brand: 'Milka', calories: 520, protein: 6.0, fat: 27.0, carbs: 63.0 },
+  '4000417025005': { name: 'Ritter Sport молочный', brand: 'Ritter Sport', calories: 535, protein: 7.5, fat: 30.0, carbs: 59.0 },
+  '4607065620392': { name: 'Гречка Мистраль', brand: 'Мистраль', calories: 329, protein: 12.6, fat: 3.3, carbs: 62.0 },
+  '4607065620408': { name: 'Рис Мистраль длиннозёрный', brand: 'Мистраль', calories: 344, protein: 7.0, fat: 1.0, carbs: 75.0 },
+  '4601234567890': { name: 'Овсянка Геркулес', brand: 'Русский продукт', calories: 342, protein: 11.0, fat: 6.2, carbs: 59.5 },
+  '4606203432456': { name: 'Докторская колбаса', brand: '', calories: 257, protein: 12.8, fat: 22.8, carbs: 1.5 },
+  '4607004390198': { name: 'Хлеб Дарницкий', brand: 'Хлебозавод', calories: 174, protein: 6.0, fat: 1.4, carbs: 34.0 },
+  '4600494008452': { name: 'Яйцо С1 10шт', brand: 'Окская птицефабрика', calories: 157, protein: 12.9, fat: 11.5, carbs: 0.8 },
+  '4607049797041': { name: 'Масло сливочное 82.5%', brand: 'Крестьянское', calories: 748, protein: 0.8, fat: 82.5, carbs: 0.8 },
+  '4600494025022': { name: 'Сметана 20%', brand: 'Простоквашино', calories: 204, protein: 2.8, fat: 20.0, carbs: 3.2 },
+  '4607038055711': { name: 'Чай Lipton жёлтый', brand: 'Lipton', calories: 0, protein: 0, fat: 0, carbs: 0 },
+  '46176492': { name: 'Белевская пастила', brand: 'Белёвские сладости', calories: 310, protein: 0.5, fat: 0.0, carbs: 76.0 },
+  '4607031762574': { name: 'Лосось слабосолёный', brand: 'Русское море', calories: 202, protein: 22.5, fat: 12.0, carbs: 0 },
+}
+
 // ── BARCODE LOOKUP PROXY ───────────────────────────────────
 router.get('/barcode/:code', async (req, res) => {
   const barcode = req.params.code.replace(/[^0-9]/g, '')
@@ -236,26 +259,35 @@ router.get('/barcode/:code', async (req, res) => {
   if (barcode.length === 13 && barcode.startsWith('4')) variants.push(barcode.slice(1))
   
   try {
+    // Check local DB first
     for (const code of variants) {
-      const r = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`, {
-        headers: { 'User-Agent': 'SOFE-HealthApp/1.0 (https://sofe-jade.vercel.app)' }
-      })
-      const data = await r.json()
-      if (data.status === 1 && data.product) {
-        const p = data.product
-        const n = p.nutriments || {}
-        return res.json({
-          found: true,
-          barcode: code,
-          name: p.product_name_ru || p.product_name || 'Продукт',
-          brand: (p.brands || '').split(',')[0].trim(),
-          calories: Math.round(n['energy-kcal_100g'] || 0),
-          protein: Math.round((n.proteins_100g || 0) * 10) / 10,
-          fat: Math.round((n.fat_100g || 0) * 10) / 10,
-          carbs: Math.round((n.carbohydrates_100g || 0) * 10) / 10,
-          image: p.image_front_small_url || null
-        })
+      if (LOCAL_BARCODES[code]) {
+        return res.json({ found: true, barcode: code, ...LOCAL_BARCODES[code] })
       }
+    }
+    // Try OFF
+    for (const code of variants) {
+      try {
+        const r = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`, {
+          headers: { 'User-Agent': 'SOFE-HealthApp/1.0 (https://sofe-jade.vercel.app; health@sofe.app)' },
+          signal: AbortSignal.timeout(8000)
+        })
+        const data = await r.json()
+        if (data.status === 1 && data.product) {
+          const p = data.product
+          const n = p.nutriments || {}
+          return res.json({
+            found: true, barcode: code,
+            name: p.product_name_ru || p.product_name || 'Продукт',
+            brand: (p.brands || '').split(',')[0].trim(),
+            calories: Math.round(n['energy-kcal_100g'] || 0),
+            protein: Math.round((n.proteins_100g || 0) * 10) / 10,
+            fat: Math.round((n.fat_100g || 0) * 10) / 10,
+            carbs: Math.round((n.carbohydrates_100g || 0) * 10) / 10,
+            image: p.image_front_small_url || null
+          })
+        }
+      } catch(e) { console.log('OFF error:', e.message) }
     }
     res.json({ found: false, barcode })
   } catch(e) {
