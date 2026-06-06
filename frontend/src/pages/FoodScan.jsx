@@ -15,6 +15,10 @@ export default function FoodScan({ onBack, onMealAdded }) {
   const [editName, setEditName] = useState('')
   const [editCal, setEditCal] = useState(0)
   const [barcodeImage, setBarcodeImage] = useState(null)
+  const [barcodeCode, setBarcodeCode] = useState('')
+  const [nameSearch, setNameSearch] = useState('')
+  const [nameResults, setNameResults] = useState([])
+  const [nameSearching, setNameSearching] = useState(false)
   const [recalcTimeout, setRecalcTimeout] = useState(null)
   const fileEnvRef = useRef(null)
   const fileGalleryRef = useRef(null)
@@ -114,7 +118,20 @@ export default function FoodScan({ onBack, onMealAdded }) {
       }
 
       if (!data || !data.product) {
-        setError(`Продукт ${barcode} не найден. Попробуй ввести название вручную.`)
+        // Try searching by barcode as text in OFF
+        try {
+          const searchRes = await fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${barcode}&search_simple=1&action=process&json=1&page_size=3`)
+          const searchData = await searchRes.json()
+          if (searchData.products?.[0]?.product_name) {
+            data = { product: searchData.products[0] }
+          }
+        } catch(e) {}
+      }
+
+      if (!data || !data.product) {
+        // Show manual name search fallback
+        setMode('barcode_name_search')
+        setBarcodeCode(barcode)
         setProcessing(false); return
       }
       const p = data.product; const n = p.nutriments || {}
@@ -192,6 +209,40 @@ export default function FoodScan({ onBack, onMealAdded }) {
       }
       img.onerror = reject; img.src = url
     })
+  }
+
+  const searchByName = async (q) => {
+    if (!q || q.length < 2) return
+    setNameSearching(true)
+    try {
+      const [ru, gl] = await Promise.allSettled([
+        fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&action=process&json=1&page_size=10&lc=ru`).then(r => r.json()),
+        fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&action=process&json=1&page_size=10`).then(r => r.json()),
+      ])
+      const parse = (data) => (data?.products || [])
+        .filter(p => p.product_name && p.nutriments?.['energy-kcal_100g'] > 0)
+        .map(p => ({
+          id: p.code,
+          name: p.product_name_ru || p.product_name,
+          brand: (p.brands || '').split(',')[0].trim(),
+          calories: Math.round(p.nutriments['energy-kcal_100g'] || 0),
+          protein: Math.round((p.nutriments.proteins_100g || 0) * 10) / 10,
+          fat: Math.round((p.nutriments.fat_100g || 0) * 10) / 10,
+          carbs: Math.round((p.nutriments.carbohydrates_100g || 0) * 10) / 10,
+        }))
+      const seen = new Set()
+      const results = [...(ru.status==='fulfilled'?parse(ru.value):[]), ...(gl.status==='fulfilled'?parse(gl.value):[])].filter(f => {
+        if (seen.has(f.name)) return false; seen.add(f.name); return true
+      })
+      setNameResults(results.slice(0, 15))
+    } catch(e) {}
+    setNameSearching(false)
+  }
+
+  const selectNameResult = (item) => {
+    setResult({ source: 'barcode', barcode: barcodeCode, ...item, unit_weight: 100 })
+    setEditName(item.name); setEditCal(item.calories)
+    setMode(null)
   }
 
   const handleAddMeal = async () => {
@@ -287,6 +338,40 @@ export default function FoodScan({ onBack, onMealAdded }) {
               📸 Сфотографировать
             </button>
             <button className="btn-outline" onClick={() => { stopCamera(); setMode(null); setScanning(false) }}>Отмена</button>
+          </div>
+        )}
+
+        {/* Barcode not found - search by name */}
+        {mode === 'barcode_name_search' && (
+          <div>
+            <div style={{ background: '#FEF9C3', borderRadius: 12, padding: 12, marginBottom: 12, fontSize: 13, color: '#854D0E' }}>
+              Штрихкод <b>{barcodeCode}</b> не найден в базе. Введи название продукта:
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+              <input placeholder="Например: Милка молочный" value={nameSearch}
+                onChange={e => setNameSearch(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && searchByName(nameSearch)}
+                style={{ flex: 1, fontSize: 15 }} autoFocus />
+              <button onClick={() => searchByName(nameSearch)}
+                style={{ background: 'var(--pink)', color: 'white', border: 'none', borderRadius: 10, padding: '0 14px', fontWeight: 700, cursor: 'pointer', fontFamily: 'Nunito, sans-serif' }}>
+                🔍
+              </button>
+            </div>
+            {nameSearching && <div style={{ textAlign: 'center', padding: 16 }}><div className="spinner" style={{ margin: '0 auto' }} /></div>}
+            {nameResults.map(item => (
+              <div key={item.id} onClick={() => selectNameResult(item)}
+                style={{ padding: '12px 14px', borderRadius: 10, background: 'var(--white)', marginBottom: 6, cursor: 'pointer', border: '0.5px solid var(--border)' }}>
+                <div style={{ fontWeight: 700, fontSize: 14 }}>{item.name}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+                  {item.brand && <span style={{ color: 'var(--pink)', marginRight: 6 }}>{item.brand}</span>}
+                  {item.calories} ккал · Б:{item.protein} · Ж:{item.fat} · У:{item.carbs}
+                </div>
+              </div>
+            ))}
+            {nameResults.length === 0 && !nameSearching && nameSearch.length > 1 && (
+              <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 13, padding: 12 }}>Ничего не найдено</div>
+            )}
+            <button className="btn-outline" style={{ marginTop: 8 }} onClick={() => { setMode(null); setNameResults([]) }}>Отмена</button>
           </div>
         )}
 
