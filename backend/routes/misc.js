@@ -246,6 +246,121 @@ const LOCAL_BARCODES = {
   '4607038055711': { name: 'Чай Lipton жёлтый', brand: 'Lipton', calories: 0, protein: 0, fat: 0, carbs: 0 },
   '46176492': { name: 'Белевская пастила', brand: 'Белёвские сладости', calories: 310, protein: 0.5, fat: 0.0, carbs: 76.0 },
   '4607031762574': { name: 'Лосось слабосолёный', brand: 'Русское море', calories: 202, protein: 22.5, fat: 12.0, carbs: 0 },
+
+  // Молочные продукты
+  '4600494002221': { name: 'Молоко Простоквашино 2.5%', brand: 'Простоквашино', calories: 52, protein: 2.9, fat: 2.5, carbs: 4.7 },
+  '4600494002238': { name: 'Молоко Простоквашино 1.5%', brand: 'Простоквашино', calories: 44, protein: 2.9, fat: 1.5, carbs: 4.7 },
+  '4607038058881': { name: 'Йогурт Активиа клубника', brand: 'Activia', calories: 95, protein: 4.0, fat: 2.8, carbs: 13.0 },
+  '4607038058898': { name: 'Йогурт Активиа персик', brand: 'Activia', calories: 94, protein: 3.9, fat: 2.7, carbs: 13.0 },
+  '4601234000015': { name: 'Сырок Б.Ю.Александров ваниль', brand: 'Александров', calories: 340, protein: 7.5, fat: 23.0, carbs: 26.0 },
+  '4601234000022': { name: 'Сырок Б.Ю.Александров клубника', brand: 'Александров', calories: 335, protein: 7.2, fat: 22.5, carbs: 26.0 },
+  '4607182230011': { name: 'Творог Чудо 4.2%', brand: 'Чудо', calories: 107, protein: 14.0, fat: 4.2, carbs: 4.5 },
+  '4670004540019': { name: 'Кефир Вкуснотеево 2.5%', brand: 'Вкуснотеево', calories: 53, protein: 2.9, fat: 2.5, carbs: 4.0 },
+  '4600494008469': { name: 'Сметана Простоквашино 15%', brand: 'Простоквашино', calories: 158, protein: 2.6, fat: 15.0, carbs: 3.0 },
+  '4607038050366': { name: 'Творог Данон 9%', brand: 'Danone', calories: 155, protein: 16.0, fat: 9.0, carbs: 2.0 },
+  '4680009780010': { name: 'Масло Крестьянское 72.5%', brand: 'Простоквашино', calories: 661, protein: 0.8, fat: 72.5, carbs: 1.3 },
+
+  // Шоколад и сладкое
+  '7622210951540': { name: 'Milka молочный шоколад 100г', brand: 'Milka', calories: 535, protein: 6.9, fat: 30.1, carbs: 59.5 },
+  '7622210951564': { name: 'Milka Орео 100г', brand: 'Milka', calories: 519, protein: 6.1, fat: 26.5, carbs: 63.6 },
+  '7622210954381': { name: 'Milka Caramel 100г', brand: 'Milka', calories: 519, protein: 5.7, fat: 27.0, carbs: 63.0 },
+  '4000417711907': { name: 'Ritter Sport Whole Hazelnuts', brand: 'Ritter Sport', calories: 562, protein: 8.5, fat: 38.0, carbs: 45.0 },
+  '4000417024008': { name: 'Ritter Sport Молочный шоколад', brand: 'Ritter Sport', calories: 535, protein: 7.5, fat: 30.0, carbs: 59.0 },
+  '4603339015839': { name: 'Шоколад Россия Нежный молочный', brand: 'Россия', calories: 544, protein: 6.5, fat: 31.0, carbs: 61.0 },
+  '4603339014009': { name: 'Шоколад Россия Золотой ярлык', brand: 'Россия', calories: 530, protein: 6.2, fat: 29.0, carbs: 62.0 },
+  '4607065650825': { name: 'Конфеты Рафаэлло', brand: 'Ferrero', calories: 601, protein: 5.7, fat: 42.6, carbs: 48.4 },
+  '4008400201306': { name: 'Ferrero Rocher 3шт', brand: 'Ferrero', calories: 573, protein: 7.3, fat: 39.0, carbs: 47.0 },
+  '4600699501016': { name: 'Мармелад Ударница', brand: 'Ударница', calories: 321, protein: 1.0, fat: 0.0, carbs: 79.0 },
+  '4607018890018': { name: 'Зефир Шармэль ваниль', brand: 'Ударница', calories: 299, protein: 0.5, fat: 0.1, carbs: 73.3 },
+  '4601234560123': { name: 'Пастила Белевская', brand: 'Белёвские сладости', calories: 310, protein: 0.5, fat: 0.0, carbs: 76.0 },
+  '4607065650818': { name: 'Вафли Артек', brand: 'КДВ', calories: 452, protein: 7.6, fat: 19.0, carbs: 63.0 },
+  '4607065650801': { name: 'Печенье Юбилейное молочное', brand: 'Kraft', calories: 440, protein: 7.4, fat: 15.0, carbs: 67.0 },
+  '7613036311403': { name: 'KitKat 4 палочки', brand: 'KitKat', calories: 513, protein: 6.3, fat: 26.8, carbs: 63.0 },
+  '7613034626974': { name: 'Bounty 57г', brand: 'Bounty', calories: 471, protein: 3.5, fat: 24.7, carbs: 60.9 },
+  '5000159461122': { name: 'Snickers 50г', brand: 'Snickers', calories: 488, protein: 8.5, fat: 23.9, carbs: 60.8 },
+  '5000159488242': { name: 'Twix 50г', brand: 'Twix', calories: 495, protein: 4.8, fat: 24.1, carbs: 64.3 },
+
+  // Соки и напитки
+  '4601234100012': { name: 'Сок Добрый яблочный 1л', brand: 'Добрый', calories: 44, protein: 0.3, fat: 0.0, carbs: 10.6 },
+  '4601234100029': { name: 'Сок Добрый апельсиновый 1л', brand: 'Добрый', calories: 46, protein: 0.5, fat: 0.0, carbs: 10.8 },
+  '4601234100036': { name: 'Сок Добрый мультифрукт 1л', brand: 'Добрый', calories: 46, protein: 0.3, fat: 0.0, carbs: 11.0 },
+  '4670016271019': { name: 'Сок Я яблочный 1л', brand: 'Я', calories: 46, protein: 0.2, fat: 0.0, carbs: 11.0 },
+  '4670016271026': { name: 'Сок Я апельсиновый 1л', brand: 'Я', calories: 45, protein: 0.6, fat: 0.0, carbs: 10.4 },
+  '4601234200011': { name: 'Rich яблоко 1л', brand: 'Rich', calories: 48, protein: 0.3, fat: 0.0, carbs: 11.3 },
+  '4601234200028': { name: 'Rich мультифрукт 1л', brand: 'Rich', calories: 50, protein: 0.3, fat: 0.0, carbs: 12.0 },
+  '4670000830016': { name: 'Вода Святой Источник 1.5л', brand: 'Святой Источник', calories: 0, protein: 0, fat: 0, carbs: 0 },
+  '4680009780003': { name: 'Вода BonAqua 1.5л', brand: 'BonAqua', calories: 0, protein: 0, fat: 0, carbs: 0 },
+  '5449000000996': { name: 'Coca-Cola 0.5л', brand: 'Coca-Cola', calories: 42, protein: 0.0, fat: 0.0, carbs: 10.6 },
+  '5449000054227': { name: 'Coca-Cola Zero 0.5л', brand: 'Coca-Cola', calories: 0, protein: 0.0, fat: 0.0, carbs: 0.0 },
+  '5449000131836': { name: 'Sprite 0.5л', brand: 'Sprite', calories: 29, protein: 0.0, fat: 0.0, carbs: 7.0 },
+  '5449000054340': { name: 'Fanta апельсин 0.5л', brand: 'Fanta', calories: 48, protein: 0.0, fat: 0.0, carbs: 11.8 },
+  '4607167392018': { name: 'Чай Greenfield Earl Grey', brand: 'Greenfield', calories: 0, protein: 0, fat: 0, carbs: 0 },
+  '4607167392025': { name: 'Чай Greenfield Flying Dragon', brand: 'Greenfield', calories: 0, protein: 0, fat: 0, carbs: 0 },
+  '4601234300019': { name: 'Кофе Nescafe Classic 190г', brand: 'Nescafe', calories: 0, protein: 0, fat: 0, carbs: 0 },
+  '7613036897464': { name: 'Nescafe Gold 190г', brand: 'Nescafe', calories: 0, protein: 0, fat: 0, carbs: 0 },
+
+  // Снеки и чипсы
+  '4606272011019': { name: 'Чипсы Lays классические 150г', brand: "Lay's", calories: 533, protein: 6.5, fat: 31.0, carbs: 57.0 },
+  '4606272011026': { name: 'Чипсы Lays сметана и лук', brand: "Lay's", calories: 530, protein: 6.3, fat: 30.5, carbs: 58.0 },
+  '4606272011033': { name: 'Чипсы Lays сыр 150г', brand: "Lay's", calories: 529, protein: 6.2, fat: 30.0, carbs: 58.5 },
+  '4606272010012': { name: 'Чипсы Pringles оригинальные 165г', brand: 'Pringles', calories: 524, protein: 6.0, fat: 29.5, carbs: 58.0 },
+  '4607065660015': { name: 'Сухарики Три Корочки бекон', brand: 'Три Корочки', calories: 381, protein: 12.5, fat: 12.0, carbs: 55.0 },
+  '4607065660022': { name: 'Сухарики Три Корочки сыр', brand: 'Три Корочки', calories: 383, protein: 12.8, fat: 12.5, carbs: 55.0 },
+  '4660003510016': { name: 'Попкорн кинотеатральный соль', brand: '', calories: 382, protein: 8.0, fat: 13.0, carbs: 60.0 },
+  '4607182230028': { name: 'Орехи Микс соленый 150г', brand: '', calories: 598, protein: 16.0, fat: 53.0, carbs: 15.0 },
+
+  // Хлеб и выпечка
+  '4607004390204': { name: 'Хлеб Бородинский', brand: 'Хлебозавод', calories: 207, protein: 6.8, fat: 1.3, carbs: 40.7 },
+  '4607004390211': { name: 'Батон нарезной', brand: 'Хлебозавод', calories: 264, protein: 8.1, fat: 2.9, carbs: 51.0 },
+  '4607065640016': { name: 'Хлебцы Finn Crisp ржаные', brand: 'Finn Crisp', calories: 318, protein: 9.0, fat: 1.5, carbs: 67.0 },
+  '4670005090015': { name: 'Хлебцы Dr.Korner гречневые', brand: 'Dr.Korner', calories: 303, protein: 10.0, fat: 2.0, carbs: 62.0 },
+
+  // Крупы и бакалея
+  '4607065620415': { name: 'Гречка Мистраль быстрого приготовления', brand: 'Мистраль', calories: 329, protein: 12.6, fat: 3.3, carbs: 62.0 },
+  '4607065620422': { name: 'Рис Мистраль круглозёрный', brand: 'Мистраль', calories: 344, protein: 7.0, fat: 1.0, carbs: 76.0 },
+  '4607065620439': { name: 'Рис Мистраль для суши', brand: 'Мистраль', calories: 344, protein: 7.0, fat: 1.0, carbs: 76.0 },
+  '4601234400017': { name: 'Макароны Makfa спагетти', brand: 'Makfa', calories: 345, protein: 12.0, fat: 1.5, carbs: 69.5 },
+  '4601234400024': { name: 'Макароны Barilla спагетти №5', brand: 'Barilla', calories: 353, protein: 12.0, fat: 1.5, carbs: 70.5 },
+  '4606272020011': { name: 'Геркулес Русский продукт', brand: 'Русский продукт', calories: 342, protein: 11.0, fat: 6.2, carbs: 59.5 },
+  '4607182230035': { name: 'Мюсли Fitness с ягодами', brand: 'Nestlé', calories: 352, protein: 8.0, fat: 3.0, carbs: 72.0 },
+
+  // Консервы и готовая еда
+  '4600001234567': { name: 'Тунец в собственном соку Bonduelle', brand: 'Bonduelle', calories: 96, protein: 22.0, fat: 1.0, carbs: 0.0 },
+  '4607065670014': { name: 'Шпроты рижские', brand: 'Рижское золото', calories: 363, protein: 17.4, fat: 32.4, carbs: 0.0 },
+  '4607065670021': { name: 'Горошек зелёный Bonduelle', brand: 'Bonduelle', calories: 55, protein: 3.6, fat: 0.1, carbs: 9.2 },
+  '4607065670038': { name: 'Кукуруза сладкая Bonduelle', brand: 'Bonduelle', calories: 82, protein: 2.9, fat: 0.6, carbs: 16.1 },
+  '4607065670045': { name: 'Фасоль красная Bonduelle', brand: 'Bonduelle', calories: 99, protein: 7.7, fat: 0.3, carbs: 15.9 },
+
+  // Мясо и колбасы
+  '4606272030010': { name: 'Колбаса Докторская Мясницкий ряд', brand: 'Мясницкий ряд', calories: 257, protein: 12.8, fat: 22.8, carbs: 1.5 },
+  '4606272030027': { name: 'Сосиски Молочные Мясницкий ряд', brand: 'Мясницкий ряд', calories: 266, protein: 10.4, fat: 23.9, carbs: 1.6 },
+  '4607182230042': { name: 'Ветчина Ромкор', brand: 'Ромкор', calories: 188, protein: 16.0, fat: 14.0, carbs: 0.0 },
+  '4607065650832': { name: 'Сардельки свиные', brand: '', calories: 332, protein: 11.8, fat: 31.6, carbs: 1.3 },
+
+  // Йогурты и десерты
+  '4607038058904': { name: 'Актимель натуральный', brand: 'Actimel', calories: 75, protein: 2.9, fat: 1.5, carbs: 11.2 },
+  '4607038058911': { name: 'Актимель клубника', brand: 'Actimel', calories: 76, protein: 2.8, fat: 1.4, carbs: 12.0 },
+  '4660003510023': { name: 'Чудо йогурт клубника-земляника', brand: 'Чудо', calories: 91, protein: 2.9, fat: 2.5, carbs: 14.3 },
+  '4660003510030': { name: 'Чудо йогурт персик-манго', brand: 'Чудо', calories: 92, protein: 2.8, fat: 2.5, carbs: 14.5 },
+  '4607038058928': { name: 'Растишка клубника', brand: 'Растишка', calories: 98, protein: 3.1, fat: 2.4, carbs: 16.0 },
+
+  // Масло и соусы
+  '4601701000015': { name: 'Масло подсолнечное Злато', brand: 'Злато', calories: 884, protein: 0.0, fat: 99.9, carbs: 0.0 },
+  '4601701000022': { name: 'Масло оливковое Iberica', brand: 'Iberica', calories: 884, protein: 0.0, fat: 99.9, carbs: 0.0 },
+  '4607065680013': { name: 'Майонез Ряба провансаль', brand: 'Ряба', calories: 627, protein: 2.8, fat: 67.0, carbs: 2.6 },
+  '4607065680020': { name: 'Кетчуп Heinz томатный', brand: 'Heinz', calories: 112, protein: 1.8, fat: 0.2, carbs: 25.9 },
+  '4607065680037': { name: 'Соус Tabasco', brand: 'Tabasco', calories: 11, protein: 0.5, fat: 0.2, carbs: 1.7 },
+
+  // Замороженные продукты
+  '4607182230059': { name: 'Пельмени Дарья классические', brand: 'Дарья', calories: 240, protein: 10.5, fat: 11.5, carbs: 23.5 },
+  '4607182230066': { name: 'Вареники с картошкой', brand: 'Дарья', calories: 175, protein: 5.0, fat: 3.0, carbs: 32.0 },
+  '4607182230073': { name: 'Блины с творогом', brand: '', calories: 177, protein: 7.2, fat: 5.8, carbs: 24.8 },
+  '4607065690012': { name: 'Мороженое Пломбир 72г', brand: 'Чистая Линия', calories: 231, protein: 3.5, fat: 15.0, carbs: 21.0 },
+  '4607065690029': { name: 'Мороженое Магнат классический', brand: 'Магнат', calories: 280, protein: 3.2, fat: 19.0, carbs: 24.0 },
+
+  // Детское питание
+  '4606272040018': { name: 'Каша Heinz гречневая', brand: 'Heinz', calories: 355, protein: 11.5, fat: 3.5, carbs: 70.0 },
+  '4606272040025': { name: 'Пюре Агуша яблоко', brand: 'Агуша', calories: 68, protein: 0.4, fat: 0.1, carbs: 16.2 },
 }
 
 // ── BARCODE LOOKUP PROXY ───────────────────────────────────
@@ -296,3 +411,4 @@ router.get('/barcode/:code', async (req, res) => {
 })
 
 module.exports = router
+// This is intentionally left empty
