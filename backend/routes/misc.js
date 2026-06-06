@@ -191,15 +191,26 @@ router.get('/food-search', async (req, res) => {
     const results = []
     
     // Search Open Food Facts with proper headers
-    const offUrl = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=20&fields=product_name,product_name_ru,brands,nutriments,code`
-    
-    const response = await fetch(offUrl, {
-      headers: {
-        'User-Agent': 'SOFE-HealthApp/1.0 (https://sofe-jade.vercel.app; contact@sofe.app)',
-        'Accept': 'application/json',
-        'Accept-Language': 'ru,en'
-      }
-    })
+    // Try multiple OFF endpoints
+    let response = null
+    const urls = [
+      `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=20&fields=product_name,product_name_ru,brands,nutriments,code`,
+      `https://ru.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=20&fields=product_name,product_name_ru,brands,nutriments,code`
+    ]
+    for (const url of urls) {
+      try {
+        response = await fetch(url, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; SOFE-App/1.0; +https://sofe-jade.vercel.app)',
+            'Accept': 'application/json',
+            'Accept-Language': 'ru,en'
+          },
+          signal: AbortSignal.timeout(8000)
+        })
+        if (response.ok) break
+      } catch(e) { response = null }
+    }
+    const offUrl = urls[0]
     
     if (response.ok) {
       const data = await response.json()
@@ -357,6 +368,23 @@ const LOCAL_BARCODES = {
   '4607182230073': { name: 'Блины с творогом', brand: '', calories: 177, protein: 7.2, fat: 5.8, carbs: 24.8 },
   '4607065690012': { name: 'Мороженое Пломбир 72г', brand: 'Чистая Линия', calories: 231, protein: 3.5, fat: 15.0, carbs: 21.0 },
   '4607065690029': { name: 'Мороженое Магнат классический', brand: 'Магнат', calories: 280, protein: 3.2, fat: 19.0, carbs: 24.0 },
+
+  // ВкусВилл
+  '2100100117191': { name: 'Яичный белок ВкусВилл', brand: 'ВкусВилл', calories: 44, protein: 10.9, fat: 0.1, carbs: 0.7 },
+  '4607073963698': { name: 'Творог высокобелковый ВкусВилл', brand: 'ВкусВилл', calories: 99, protein: 18.0, fat: 0.1, carbs: 3.5 },
+  '2100100011536': { name: 'Сухарики пшеничные ВкусВилл', brand: 'ВкусВилл', calories: 381, protein: 12.5, fat: 12.0, carbs: 55.0 },
+  '4630053492062': { name: 'Плов с курицей ВкусВилл', brand: 'ВкусВилл', calories: 155, protein: 8.5, fat: 6.5, carbs: 16.0 },
+  '4607073963704': { name: 'Творог 5% ВкусВилл', brand: 'ВкусВилл', calories: 121, protein: 17.0, fat: 5.0, carbs: 1.8 },
+  '4607073963711': { name: 'Кефир 2.5% ВкусВилл', brand: 'ВкусВилл', calories: 53, protein: 2.9, fat: 2.5, carbs: 4.0 },
+  '4607073963728': { name: 'Молоко 2.5% ВкусВилл', brand: 'ВкусВилл', calories: 52, protein: 2.9, fat: 2.5, carbs: 4.7 },
+  '4607073963735': { name: 'Йогурт натуральный ВкусВилл', brand: 'ВкусВилл', calories: 66, protein: 4.0, fat: 3.0, carbs: 4.5 },
+  '4607073963742': { name: 'Сметана 20% ВкусВилл', brand: 'ВкусВилл', calories: 204, protein: 2.8, fat: 20.0, carbs: 3.2 },
+  '4607073963759': { name: 'Греча ВкусВилл', brand: 'ВкусВилл', calories: 329, protein: 12.6, fat: 3.3, carbs: 62.0 },
+  '4607073963766': { name: 'Хлеб цельнозерновой ВкусВилл', brand: 'ВкусВилл', calories: 213, protein: 8.0, fat: 2.5, carbs: 38.0 },
+  '4607073963773': { name: 'Печенье овсяное ВкусВилл', brand: 'ВкусВилл', calories: 380, protein: 7.5, fat: 12.0, carbs: 60.0 },
+  '4607073963780': { name: 'Мюсли ВкусВилл с сухофруктами', brand: 'ВкусВилл', calories: 358, protein: 9.0, fat: 5.5, carbs: 68.0 },
+  '4630053492079': { name: 'Суп томатный ВкусВилл', brand: 'ВкусВилл', calories: 42, protein: 1.5, fat: 1.2, carbs: 6.5 },
+  '4630053492086': { name: 'Котлеты куриные ВкусВилл', brand: 'ВкусВилл', calories: 185, protein: 16.0, fat: 11.5, carbs: 5.0 },
 
   // Детское питание
   '4606272040018': { name: 'Каша Heinz гречневая', brand: 'Heinz', calories: 355, protein: 11.5, fat: 3.5, carbs: 70.0 },
