@@ -182,4 +182,85 @@ router.post('/workouts/log', auth, async (req, res) => {
   res.json({ ok: true })
 })
 
+// ── FOOD SEARCH PROXY ─────────────────────────────────────
+router.get('/food-search', async (req, res) => {
+  const query = req.query.q || ''
+  if (!query || query.length < 2) return res.json([])
+  
+  try {
+    const results = []
+    
+    // Search Open Food Facts with proper headers
+    const offUrl = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=20&fields=product_name,product_name_ru,brands,nutriments,code`
+    
+    const response = await fetch(offUrl, {
+      headers: {
+        'User-Agent': 'SOFE-HealthApp/1.0 (https://sofe-jade.vercel.app; contact@sofe.app)',
+        'Accept': 'application/json',
+        'Accept-Language': 'ru,en'
+      }
+    })
+    
+    if (response.ok) {
+      const data = await response.json()
+      const products = (data.products || [])
+        .filter(p => p.product_name && p.nutriments?.['energy-kcal_100g'] > 0)
+        .map(p => ({
+          id: 'off_' + p.code,
+          name: (p.product_name_ru || p.product_name || '').trim(),
+          brand: (p.brands || '').split(',')[0].trim(),
+          calories: Math.round(p.nutriments['energy-kcal_100g'] || 0),
+          protein: Math.round((p.nutriments.proteins_100g || 0) * 10) / 10,
+          fat: Math.round((p.nutriments.fat_100g || 0) * 10) / 10,
+          carbs: Math.round((p.nutriments.carbohydrates_100g || 0) * 10) / 10,
+          unit: '100г', unit_weight: 100
+        }))
+      results.push(...products)
+    }
+    
+    res.json(results.slice(0, 25))
+  } catch(e) {
+    console.error('Food search error:', e.message)
+    res.json([])
+  }
+})
+
+// ── BARCODE LOOKUP PROXY ───────────────────────────────────
+router.get('/barcode/:code', async (req, res) => {
+  const barcode = req.params.code.replace(/[^0-9]/g, '')
+  if (!barcode) return res.status(400).json({ error: 'Invalid barcode' })
+  
+  // Try multiple variants
+  const variants = [barcode]
+  if (barcode.length === 12) variants.push('4' + barcode, '0' + barcode)
+  if (barcode.length === 13 && barcode.startsWith('4')) variants.push(barcode.slice(1))
+  
+  try {
+    for (const code of variants) {
+      const r = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`, {
+        headers: { 'User-Agent': 'SOFE-HealthApp/1.0 (https://sofe-jade.vercel.app)' }
+      })
+      const data = await r.json()
+      if (data.status === 1 && data.product) {
+        const p = data.product
+        const n = p.nutriments || {}
+        return res.json({
+          found: true,
+          barcode: code,
+          name: p.product_name_ru || p.product_name || 'Продукт',
+          brand: (p.brands || '').split(',')[0].trim(),
+          calories: Math.round(n['energy-kcal_100g'] || 0),
+          protein: Math.round((n.proteins_100g || 0) * 10) / 10,
+          fat: Math.round((n.fat_100g || 0) * 10) / 10,
+          carbs: Math.round((n.carbohydrates_100g || 0) * 10) / 10,
+          image: p.image_front_small_url || null
+        })
+      }
+    }
+    res.json({ found: false, barcode })
+  } catch(e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
 module.exports = router
