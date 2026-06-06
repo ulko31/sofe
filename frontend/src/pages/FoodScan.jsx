@@ -100,9 +100,20 @@ export default function FoodScan({ onBack, onMealAdded }) {
   const lookupBarcode = async (barcode) => {
     setProcessing(true); setError(null)
     try {
-      const r = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`)
-      const data = await r.json()
-      if (data.status === 0 || !data.product) {
+      // Try original + variants (AI sometimes misses first digit)
+      const variants = [barcode]
+      if (barcode.length === 12) variants.push('4' + barcode) // EAN-13 starting with 4
+      if (barcode.length === 12) variants.push('0' + barcode) // UPC-A to EAN-13
+      if (barcode.startsWith('4') && barcode.length === 13) variants.push(barcode.slice(1)) // remove leading 4
+      
+      let data = null
+      for (const code of variants) {
+        const r = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`)
+        const d = await r.json()
+        if (d.status === 1 && d.product) { data = d; break }
+      }
+
+      if (!data || !data.product) {
         setError(`Продукт ${barcode} не найден. Попробуй ввести название вручную.`)
         setProcessing(false); return
       }
