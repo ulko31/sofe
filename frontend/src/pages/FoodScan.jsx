@@ -70,82 +70,74 @@ export default function FoodScan({ onBack, onMealAdded }) {
     const imgData = canvas.toDataURL('image/jpeg', 0.92)
     stopCamera(); setScanning(false); setProcessing(true)
 
+    const groqToken = import.meta.env.VITE_GROQ_TOKEN
+    if (!groqToken) {
+      setBarcodeImage(imgData); setManualBarcode(''); setMode('barcode_manual'); setProcessing(false); return
+    }
+
     try {
-      const groqToken = import.meta.env.VITE_GROQ_TOKEN
-      if (groqToken) {
-        const base64 = imgData.split(',')[1]
-        const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${groqToken}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: 'meta-llama/llama-4-scout-17b-16e-instruct',
-            messages: [{ role: 'user', content: [
-              { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64}`, detail: 'high' } },
-              { type: 'text', text: 'Read the digits printed as text BELOW the barcode stripes (not the stripes themselves). Reply with ONLY those digits. Example: 4607134960400' }
-            ]}],
-            max_tokens: 20, temperature: 0
-          })
+      const base64 = imgData.split(',')[1]
+      // Ask AI to recognize the product from photo — name AND nutrition
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${groqToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+          messages: [{ role: 'user', content: [
+            { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64}`, detail: 'high' } },
+            { type: 'text', text: 'This is a food product photo. Identify the product name and its nutrition per 100g. Reply ONLY with JSON: {"name":"product name in Russian","brand":"brand if visible","calories":number,"protein":number,"fat":number,"carbs":number}. Use nutrition label if visible, otherwise estimate.' }
+          ]}],
+          max_tokens: 150, temperature: 0
         })
-        const data = await res.json()
-        const code = (data.choices?.[0]?.message?.content?.trim() || '').replace(/[^0-9]/g, '')
-        // Show editable field with AI result (even if possibly wrong)
-        setBarcodeImage(imgData)
-        setManualBarcode(code.length >= 4 ? code : '')
-        setMode('barcode_manual')
-        setProcessing(false)
-        return
+      })
+      const data = await res.json()
+      const text = data.choices?.[0]?.message?.content?.trim() || ''
+      const match = text.match(/\{[^{}]+\}/)
+      if (match) {
+        const p = JSON.parse(match[0])
+        if (p.name && p.calories > 0) {
+          setResult({
+            source: 'barcode',
+            name: p.name,
+            brand: p.brand || '',
+            calories: Math.round(p.calories),
+            protein: Math.round((p.protein || 0) * 10) / 10,
+            fat: Math.round((p.fat || 0) * 10) / 10,
+            carbs: Math.round((p.carbs || 0) * 10) / 10,
+            unit_weight: 100,
+            imageFile: imgData
+          })
+          setEditName(p.name)
+          setEditCal(Math.round(p.calories))
+          setProcessing(false)
+          return
+        }
       }
     } catch(e) {}
 
-    // No token — show empty editable field
-    setBarcodeImage(imgData)
-    setManualBarcode('')
-    setMode('barcode_manual')
-    setProcessing(false)
+    // Fallback — manual input
+    setBarcodeImage(imgData); setManualBarcode(''); setMode('barcode_manual'); setProcessing(false)
   }
 
   const lookupBarcode = async (barcode) => {
     const code = barcode.replace(/[^0-9]/g, '')
     if (!code) return
     setProcessing(true); setError(null)
-
-    // Try multiple code variants
-    const variants = [code]
-    if (code.length === 12) variants.push('4' + code, '0' + code)
-    if (code.length === 13 && code[0] === '4') variants.push(code.slice(1))
-
     try {
-      for (const v of variants) {
-        const r = await fetch(`https://world.openfoodfacts.org/api/v0/product/${v}.json`)
-        const data = await r.json()
-        if (data.status === 1 && data.product) {
-          const p = data.product
-          const n = p.nutriments || {}
-          const cal = Math.round(n['energy-kcal_100g'] || 0)
-          if (cal > 0) {
-            const res = {
-              source: 'barcode', barcode: v,
-              name: p.product_name_ru || p.product_name || 'Продукт',
-              brand: (p.brands || '').split(',')[0].trim(),
-              calories: cal,
-              protein: Math.round((n.proteins_100g || 0) * 10) / 10,
-              fat: Math.round((n.fat_100g || 0) * 10) / 10,
-              carbs: Math.round((n.carbohydrates_100g || 0) * 10) / 10,
-              image: p.image_front_small_url || null,
-              unit_weight: 100
-            }
-            setResult(res); setEditName(res.name); setEditCal(res.calories)
-            setProcessing(false); return
-          }
-        }
+      // Route through backend — it handles local DB + OFF with proper headers
+      const apiUrl = import.meta.env.VITE_API_URL || 'https://sofe-1615.onrender.com/api'
+      const r = await fetch(`${apiUrl}/barcode/${code}`)
+      const data = await r.json()
+      if (data.found) {
+        setResult({ source: 'barcode', ...data, unit_weight: 100 })
+        setEditName(data.name)
+        setEditCal(data.calories)
+        setProcessing(false); return
       }
-      // Not found — switch to name search
-      setBarcodeCode(code)
-      setMode('barcode_name_search')
-    } catch(e) {
-      setBarcodeCode(code)
-      setMode('barcode_name_search')
-    }
+    } catch(e) {}
+    // Not found anywhere
+    setBarcodeCode(code)
+    setMode('barcode_name_search')
     setProcessing(false)
   }
 
@@ -214,23 +206,11 @@ export default function FoodScan({ onBack, onMealAdded }) {
     if (!q || q.length < 2) return
     setNameSearching(true)
     try {
-      // Search OFF directly from browser (no CORS issues for browsers)
-      const r = await fetch(
-        `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=20&fields=product_name,product_name_ru,brands,nutriments,code`
-      )
-      const data = await r.json()
-      const products = (data.products || [])
-        .filter(p => p.product_name && p.nutriments?.['energy-kcal_100g'] > 0)
-        .map(p => ({
-          id: 'off_' + p.code,
-          name: (p.product_name_ru || p.product_name || '').trim(),
-          brand: (p.brands || '').split(',')[0].trim(),
-          calories: Math.round(p.nutriments['energy-kcal_100g'] || 0),
-          protein: Math.round((p.nutriments.proteins_100g || 0) * 10) / 10,
-          fat: Math.round((p.nutriments.fat_100g || 0) * 10) / 10,
-          carbs: Math.round((p.nutriments.carbohydrates_100g || 0) * 10) / 10,
-        }))
-      if (products.length > 0) {
+      // Search via backend (handles CORS and OFF properly)
+      const apiUrl = import.meta.env.VITE_API_URL || 'https://sofe-1615.onrender.com/api'
+      const r = await fetch(`${apiUrl}/food-search?q=${encodeURIComponent(q)}`)
+      const products = await r.json()
+      if (Array.isArray(products) && products.length > 0) {
         setNameResults(products.slice(0, 20))
         setNameSearching(false)
         return
@@ -329,8 +309,8 @@ export default function FoodScan({ onBack, onMealAdded }) {
             <div onClick={startBarcodeCamera}
               style={{ background: 'var(--white)', borderRadius: 'var(--radius)', padding: 24, textAlign: 'center', cursor: 'pointer', border: '2px dashed var(--green-mid)' }}>
               <div style={{ fontSize: 48, marginBottom: 12 }}>📦</div>
-              <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 4 }}>Сканировать штрихкод</div>
-              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Сделай фото штрихкода — ИИ прочитает цифры</div>
+              <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 4 }}>Сфотографировать продукт</div>
+              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>ИИ распознает название и КБЖУ с упаковки</div>
             </div>
 
             <div className="card" style={{ padding: 16 }}>
@@ -364,10 +344,10 @@ export default function FoodScan({ onBack, onMealAdded }) {
               </div>
             </div>
             <div style={{ textAlign: 'center', padding: '10px 0 14px', color: 'var(--text-muted)', fontSize: 13 }}>
-              Наведи камеру на штрихкод
+              Наведи камеру на упаковку продукта
             </div>
             <button className="btn-primary" style={{ marginBottom: 10, fontSize: 16 }} onClick={captureBarcode}>
-              📸 Сфотографировать
+              📸 Распознать продукт
             </button>
             <button className="btn-outline" onClick={() => { stopCamera(); setMode(null); setScanning(false) }}>Отмена</button>
           </div>
