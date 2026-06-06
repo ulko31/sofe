@@ -59,12 +59,49 @@ export default function FoodScan({ onBack, onMealAdded }) {
     }
   }
 
-  const captureBarcode = () => {
+  const captureBarcode = async () => {
     haptic('medium')
-    // Show manual input directly - AI barcode reading is unreliable
-    stopCamera()
-    setScanning(false)
+    const v = document.getElementById('barcode-video')
+    if (!v) return
+    const canvas = document.createElement('canvas')
+    canvas.width = v.videoWidth || 1280
+    canvas.height = v.videoHeight || 720
+    canvas.getContext('2d').drawImage(v, 0, 0)
+    const imgData = canvas.toDataURL('image/jpeg', 0.92)
+    stopCamera(); setScanning(false); setProcessing(true)
+
+    try {
+      const groqToken = import.meta.env.VITE_GROQ_TOKEN
+      if (groqToken) {
+        const base64 = imgData.split(',')[1]
+        const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${groqToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+            messages: [{ role: 'user', content: [
+              { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64}`, detail: 'high' } },
+              { type: 'text', text: 'Read the digits printed as text BELOW the barcode stripes (not the stripes themselves). Reply with ONLY those digits. Example: 4607134960400' }
+            ]}],
+            max_tokens: 20, temperature: 0
+          })
+        })
+        const data = await res.json()
+        const code = (data.choices?.[0]?.message?.content?.trim() || '').replace(/[^0-9]/g, '')
+        // Show editable field with AI result (even if possibly wrong)
+        setBarcodeImage(imgData)
+        setManualBarcode(code.length >= 4 ? code : '')
+        setMode('barcode_manual')
+        setProcessing(false)
+        return
+      }
+    } catch(e) {}
+
+    // No token — show empty editable field
+    setBarcodeImage(imgData)
+    setManualBarcode('')
     setMode('barcode_manual')
+    setProcessing(false)
   }
 
   const lookupBarcode = async (barcode) => {
@@ -333,22 +370,34 @@ export default function FoodScan({ onBack, onMealAdded }) {
           </div>
         )}
 
-        {/* Manual barcode fallback */}
+        {/* Barcode manual — editable field with AI prefill */}
         {mode === 'barcode_manual' && (
           <div>
-            {barcodeImage && <img src={barcodeImage} alt="" style={{ width: '100%', borderRadius: 12, marginBottom: 12 }} />}
-            <div style={{ background: '#FEF9C3', borderRadius: 12, padding: 12, marginBottom: 12, fontSize: 13, color: '#854D0E' }}>
-              ИИ не смог распознать штрихкод. Введи цифры с упаковки:
+            {barcodeImage && <img src={barcodeImage} alt="" style={{ width: '100%', borderRadius: 12, marginBottom: 12, maxHeight: 200, objectFit: 'cover' }} />}
+            <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 8 }}>
+              {manualBarcode ? '📋 Проверь цифры штрихкода:' : '✏️ Введи цифры со штрихкода:'}
             </div>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-              <input type="number" placeholder="4607031762574" value={manualBarcode}
+            {manualBarcode ? (
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
+                ИИ считал эти цифры — проверь и исправь если нужно
+              </div>
+            ) : null}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+              <input
+                type="number"
+                placeholder="4607031762574"
+                value={manualBarcode}
                 onChange={e => setManualBarcode(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && manualBarcode && lookupBarcode(manualBarcode)}
-                style={{ flex: 1, fontSize: 16 }} autoFocus />
+                style={{ flex: 1, fontSize: 18, fontWeight: 700, letterSpacing: 1 }}
+                autoFocus
+              />
               <button onClick={() => manualBarcode && lookupBarcode(manualBarcode)}
-                style={{ background: 'var(--pink)', color: 'white', border: 'none', borderRadius: 10, padding: '0 16px', fontWeight: 700, cursor: 'pointer', fontFamily: 'Nunito, sans-serif' }}>Найти</button>
+                style={{ background: 'var(--pink)', color: 'white', border: 'none', borderRadius: 10, padding: '0 18px', fontWeight: 700, cursor: 'pointer', fontFamily: 'Nunito, sans-serif', fontSize: 14 }}>
+                Найти
+              </button>
             </div>
-            <button className="btn-outline" onClick={() => { setMode(null); setBarcodeImage(null) }}>Назад</button>
+            <button className="btn-outline" onClick={() => { setMode(null); setBarcodeImage(null); setManualBarcode('') }}>Назад</button>
           </div>
         )}
 
