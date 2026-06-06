@@ -59,46 +59,12 @@ export default function FoodScan({ onBack, onMealAdded }) {
     }
   }
 
-  const captureBarcode = async () => {
+  const captureBarcode = () => {
     haptic('medium')
-    const v = document.getElementById('barcode-video')
-    if (!v) return
-    const canvas = document.createElement('canvas')
-    canvas.width = v.videoWidth || 1280
-    canvas.height = v.videoHeight || 720
-    canvas.getContext('2d').drawImage(v, 0, 0)
-    const imgData = canvas.toDataURL('image/jpeg', 0.92)
-    stopCamera(); setScanning(false); setProcessing(true)
-
-    try {
-      const groqToken = import.meta.env.VITE_GROQ_TOKEN
-      if (!groqToken) throw new Error('no_token')
-      const base64 = imgData.split(',')[1]
-      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${groqToken}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'meta-llama/llama-4-scout-17b-16e-instruct',
-          messages: [{ role: 'user', content: [
-            { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64}`, detail: 'high' } },
-            { type: 'text', text: 'Look at this image. Find the barcode. Read ONLY the human-readable digits printed in text BELOW or ABOVE the barcode stripes — do NOT read the vertical bars/lines themselves. The digits are usually 8-13 numbers printed as text under the bars. Reply with ONLY those digits, nothing else. Example: 4600742015087. If you cannot find printed digit text, reply NOT_FOUND.' }
-          ]}],
-          max_tokens: 20, temperature: 0
-        })
-      })
-      const data = await res.json()
-      const raw = data.choices?.[0]?.message?.content?.trim() || ''
-      const code = raw.replace(/[^0-9]/g, '')
-      if (code.length >= 8) {
-        await lookupBarcode(code)
-        return
-      }
-    } catch(e) {}
-
-    // AI failed — show image + manual input
-    setBarcodeImage(imgData)
+    // Show manual input directly - AI barcode reading is unreliable
+    stopCamera()
+    setScanning(false)
     setMode('barcode_manual')
-    setProcessing(false)
   }
 
   const lookupBarcode = async (barcode) => {
@@ -186,13 +152,48 @@ export default function FoodScan({ onBack, onMealAdded }) {
     if (!q || q.length < 2) return
     setNameSearching(true)
     try {
+      // Try backend proxy first
       const apiUrl = import.meta.env.VITE_API_URL || '/api'
       const r = await fetch(`${apiUrl}/food-search?q=${encodeURIComponent(q)}`)
       const results = await r.json()
-      setNameResults(Array.isArray(results) ? results : [])
-    } catch(e) {
-      setNameResults([])
-    }
+      if (Array.isArray(results) && results.length > 0) {
+        setNameResults(results)
+        setNameSearching(false)
+        return
+      }
+    } catch(e) {}
+
+    // Fallback: ask Groq AI for nutrition info
+    try {
+      const groqToken = import.meta.env.VITE_GROQ_TOKEN
+      if (!groqToken) { setNameResults([]); setNameSearching(false); return }
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${groqToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          messages: [{ role: 'user', content: `Дай КБЖУ на 100г для "${q}". Ответь ТОЛЬКО JSON массивом 1-3 вариантов: [{"name":"точное название","calories":число,"protein":г,"fat":г,"carbs":г}]. Без пояснений.` }],
+          max_tokens: 200, temperature: 0
+        })
+      })
+      const data = await res.json()
+      const text = data.choices?.[0]?.message?.content?.trim() || ''
+      const match = text.match(/\[[\s\S]*\]/)
+      if (match) {
+        const items = JSON.parse(match[0])
+        setNameResults(items.map((item, i) => ({
+          id: 'ai_' + i,
+          name: item.name,
+          brand: '🤖 ИИ',
+          calories: Math.round(item.calories || 0),
+          protein: Math.round((item.protein || 0) * 10) / 10,
+          fat: Math.round((item.fat || 0) * 10) / 10,
+          carbs: Math.round((item.carbs || 0) * 10) / 10,
+        })))
+      } else {
+        setNameResults([])
+      }
+    } catch(e) { setNameResults([]) }
     setNameSearching(false)
   }
 
