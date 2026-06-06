@@ -13,6 +13,7 @@ export default function FoodScan({ onBack, onMealAdded, initialMode }) {
   const [weight, setWeight] = useState('100')
   const [manualBarcode, setManualBarcode] = useState('')
   const [editName, setEditName] = useState('')
+  const [barcodeImage, setBarcodeImage] = useState(null)
   const fileEnvRef = useRef(null)
   const fileGalleryRef = useRef(null)
   const videoRef = useRef(null)
