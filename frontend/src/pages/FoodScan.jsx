@@ -81,7 +81,7 @@ export default function FoodScan({ onBack, onMealAdded }) {
           model: 'meta-llama/llama-4-scout-17b-16e-instruct',
           messages: [{ role: 'user', content: [
             { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64}`, detail: 'high' } },
-            { type: 'text', text: 'Find the barcode in this image. Read all digits printed under or above the barcode lines. Reply with ONLY the digits (8-14 numbers), nothing else. If no barcode found, reply NOT_FOUND.' }
+            { type: 'text', text: 'Look at this image. Find the barcode. Read ONLY the human-readable digits printed in text BELOW or ABOVE the barcode stripes — do NOT read the vertical bars/lines themselves. The digits are usually 8-13 numbers printed as text under the bars. Reply with ONLY those digits, nothing else. Example: 4600742015087. If you cannot find printed digit text, reply NOT_FOUND.' }
           ]}],
           max_tokens: 20, temperature: 0
         })
@@ -104,49 +104,20 @@ export default function FoodScan({ onBack, onMealAdded }) {
   const lookupBarcode = async (barcode) => {
     setProcessing(true); setError(null)
     try {
-      // Try original + variants (AI sometimes misses first digit)
-      const variants = [barcode]
-      if (barcode.length === 12) variants.push('4' + barcode) // EAN-13 starting with 4
-      if (barcode.length === 12) variants.push('0' + barcode) // UPC-A to EAN-13
-      if (barcode.startsWith('4') && barcode.length === 13) variants.push(barcode.slice(1)) // remove leading 4
+      const apiUrl = import.meta.env.VITE_API_URL || '/api'
+      const r = await fetch(`${apiUrl}/barcode/${barcode.replace(/[^0-9]/g, '')}`)
+      const data = await r.json()
       
-      let data = null
-      for (const code of variants) {
-        const r = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`)
-        const d = await r.json()
-        if (d.status === 1 && d.product) { data = d; break }
-      }
-
-      if (!data || !data.product) {
-        // Try searching by barcode as text in OFF
-        try {
-          const searchRes = await fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${barcode}&search_simple=1&action=process&json=1&page_size=3`)
-          const searchData = await searchRes.json()
-          if (searchData.products?.[0]?.product_name) {
-            data = { product: searchData.products[0] }
-          }
-        } catch(e) {}
-      }
-
-      if (!data || !data.product) {
-        // Show manual name search fallback
+      if (!data.found) {
         setMode('barcode_name_search')
         setBarcodeCode(barcode)
         setProcessing(false); return
       }
-      const p = data.product; const n = p.nutriments || {}
-      const res = {
-        source: 'barcode', barcode,
-        name: p.product_name_ru || p.product_name || 'Продукт',
-        brand: p.brands || '',
-        calories: Math.round(n['energy-kcal_100g'] || 0),
-        protein: Math.round((n.proteins_100g || 0) * 10) / 10,
-        fat: Math.round((n.fat_100g || 0) * 10) / 10,
-        carbs: Math.round((n.carbohydrates_100g || 0) * 10) / 10,
-        image: p.image_front_small_url || null, unit_weight: 100
-      }
-      setResult(res); setEditName(res.name); setEditCal(res.calories)
-    } catch(e) { setError('Ошибка сети.') }
+      
+      setResult({ source: 'barcode', ...data, unit_weight: 100 })
+      setEditName(data.name)
+      setEditCal(data.calories)
+    } catch(e) { setError('Ошибка сети. Попробуй ввести название вручную.') }
     finally { setProcessing(false) }
   }
 
@@ -215,27 +186,13 @@ export default function FoodScan({ onBack, onMealAdded }) {
     if (!q || q.length < 2) return
     setNameSearching(true)
     try {
-      const [ru, gl] = await Promise.allSettled([
-        fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&action=process&json=1&page_size=10&lc=ru`).then(r => r.json()),
-        fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&action=process&json=1&page_size=10`).then(r => r.json()),
-      ])
-      const parse = (data) => (data?.products || [])
-        .filter(p => p.product_name && p.nutriments?.['energy-kcal_100g'] > 0)
-        .map(p => ({
-          id: p.code,
-          name: p.product_name_ru || p.product_name,
-          brand: (p.brands || '').split(',')[0].trim(),
-          calories: Math.round(p.nutriments['energy-kcal_100g'] || 0),
-          protein: Math.round((p.nutriments.proteins_100g || 0) * 10) / 10,
-          fat: Math.round((p.nutriments.fat_100g || 0) * 10) / 10,
-          carbs: Math.round((p.nutriments.carbohydrates_100g || 0) * 10) / 10,
-        }))
-      const seen = new Set()
-      const results = [...(ru.status==='fulfilled'?parse(ru.value):[]), ...(gl.status==='fulfilled'?parse(gl.value):[])].filter(f => {
-        if (seen.has(f.name)) return false; seen.add(f.name); return true
-      })
-      setNameResults(results.slice(0, 15))
-    } catch(e) {}
+      const apiUrl = import.meta.env.VITE_API_URL || '/api'
+      const r = await fetch(`${apiUrl}/food-search?q=${encodeURIComponent(q)}`)
+      const results = await r.json()
+      setNameResults(Array.isArray(results) ? results : [])
+    } catch(e) {
+      setNameResults([])
+    }
     setNameSearching(false)
   }
 
