@@ -72,12 +72,25 @@ export default function Home({ user, onOpenAI, onTabChange }) {
     setSearching(true)
     searchTimeout.current = setTimeout(async () => {
       try {
-        // Search via backend proxy (avoids CORS/403)
+        // Search OFF directly from browser
         let offFoods = []
         try {
-          const apiUrl = import.meta.env.VITE_API_URL || '/api'
-          const r = await fetch(`${apiUrl}/food-search?q=${encodeURIComponent(query)}`)
-          offFoods = await r.json()
+          const r = await fetch(
+            `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=20&fields=product_name,product_name_ru,brands,nutriments,code`
+          )
+          const data = await r.json()
+          offFoods = (data.products || [])
+            .filter(p => p.product_name && p.nutriments?.['energy-kcal_100g'] > 0)
+            .map(p => ({
+              id: 'off_' + p.code,
+              name: (p.product_name_ru || p.product_name || '').trim(),
+              brand: (p.brands || '').split(',')[0].trim(),
+              calories: Math.round(p.nutriments['energy-kcal_100g'] || 0),
+              protein: Math.round((p.nutriments.proteins_100g || 0) * 10) / 10,
+              fat: Math.round((p.nutriments.fat_100g || 0) * 10) / 10,
+              carbs: Math.round((p.nutriments.carbohydrates_100g || 0) * 10) / 10,
+              unit: '100г', unit_weight: 100
+            }))
         } catch(e) {}
 
         // Also search backend DB
