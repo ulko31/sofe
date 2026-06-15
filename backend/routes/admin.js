@@ -107,6 +107,40 @@ router.delete('/places/:id', adminAuth, async (req, res) => {
   res.json({ ok: true })
 })
 
+// NUTRITION (user meals log)
+router.get('/nutrition', adminAuth, async (req, res) => {
+  try {
+    const meals = await q(`
+      SELECT m.*, u.name as user_name, u.telegram_id
+      FROM meals m
+      LEFT JOIN users u ON u.id = m.user_id
+      ORDER BY m.created_at DESC
+      LIMIT 200
+    `)
+    res.json({ meals })
+  } catch(e) { res.status(500).json({ error: e.message }) }
+})
+
+router.delete('/nutrition/:id', adminAuth, async (req, res) => {
+  await r('DELETE FROM meals WHERE id = ?', [req.params.id])
+  res.json({ ok: true })
+})
+
+// USERS - update onboarded/notifications
+router.put('/users/:id', adminAuth, async (req, res) => {
+  const { onboarded, notifications_enabled, calories, goal } = req.body
+  await r(`UPDATE users SET
+    onboarded = COALESCE(?, onboarded),
+    notifications_enabled = COALESCE(?, notifications_enabled),
+    calories = COALESCE(?, calories),
+    goal = COALESCE(?, goal)
+    WHERE id = ?`,
+    [onboarded != null ? onboarded : null,
+     notifications_enabled != null ? notifications_enabled : null,
+     calories || null, goal || null, req.params.id])
+  res.json(await qOne('SELECT * FROM users WHERE id = ?', [req.params.id]))
+})
+
 // FOODS
 router.get('/foods', adminAuth, async (req, res) => {
   const foods = await q('SELECT * FROM foods ORDER BY name')
