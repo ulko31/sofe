@@ -9,6 +9,28 @@ const adminAuth = (req, res, next) => {
   next()
 }
 
+// STATS for dashboard
+router.get('/stats', adminAuth, async (req, res) => {
+  try {
+    const users = await q('SELECT * FROM users')
+    const meals = await q('SELECT * FROM meals')
+    const events = await q('SELECT * FROM events')
+    const recipes = await q('SELECT * FROM recipes')
+    const today = new Date().toISOString().split('T')[0]
+    const todayMeals = meals.filter(m => m.date === today)
+    const activeToday = new Set(todayMeals.map(m => m.user_id)).size
+    res.json({
+      totalUsers: users.length,
+      onboardedUsers: users.filter(u => u.onboarded).length,
+      activeToday,
+      totalMeals: meals.length,
+      totalEvents: events.length,
+      totalRecipes: recipes.length,
+      newUsersToday: users.filter(u => u.created_at?.startsWith(today)).length
+    })
+  } catch(e) { res.status(500).json({ error: e.message }) }
+})
+
 // USERS
 router.get('/users', adminAuth, async (req, res) => {
   const users = await q('SELECT * FROM users ORDER BY created_at DESC')
@@ -110,6 +132,7 @@ router.delete('/places/:id', adminAuth, async (req, res) => {
 // NUTRITION (user meals log)
 router.get('/nutrition', adminAuth, async (req, res) => {
   try {
+    const today = new Date().toISOString().split('T')[0]
     const meals = await q(`
       SELECT m.*, u.name as user_name, u.telegram_id
       FROM meals m
@@ -117,13 +140,51 @@ router.get('/nutrition', adminAuth, async (req, res) => {
       ORDER BY m.created_at DESC
       LIMIT 200
     `)
-    res.json({ meals })
+    const todayMeals = meals.filter(m => m.date === today)
+    const todayCalories = todayMeals.reduce((s, m) => s + (m.calories || 0), 0)
+    // Average calories per user per day
+    const allCalories = meals.reduce((s, m) => s + (m.calories || 0), 0)
+    const avgCalories = meals.length ? Math.round(allCalories / meals.length * 3) : 0
+    // Popular meal type
+    const typeCounts = {}
+    meals.forEach(m => { typeCounts[m.type] = (typeCounts[m.type] || 0) + 1 })
+    const popularType = Object.entries(typeCounts).sort((a,b) => b[1]-a[1])[0]?.[0] || '—'
+    res.json({
+      meals, // for backwards compat
+      recentMeals: meals.slice(0, 50),
+      total: meals.length,
+      today: todayCalories,
+      avgCalories,
+      popularType
+    })
   } catch(e) { res.status(500).json({ error: e.message }) }
 })
 
 router.delete('/nutrition/:id', adminAuth, async (req, res) => {
   await r('DELETE FROM meals WHERE id = ?', [req.params.id])
   res.json({ ok: true })
+})
+
+// STATS for dashboard
+router.get('/stats', adminAuth, async (req, res) => {
+  try {
+    const users = await q('SELECT * FROM users')
+    const meals = await q('SELECT * FROM meals')
+    const events = await q('SELECT * FROM events')
+    const recipes = await q('SELECT * FROM recipes')
+    const today = new Date().toISOString().split('T')[0]
+    const todayMeals = meals.filter(m => m.date === today)
+    const activeToday = new Set(todayMeals.map(m => m.user_id)).size
+    res.json({
+      totalUsers: users.length,
+      onboardedUsers: users.filter(u => u.onboarded).length,
+      activeToday,
+      totalMeals: meals.length,
+      totalEvents: events.length,
+      totalRecipes: recipes.length,
+      newUsersToday: users.filter(u => u.created_at?.startsWith(today)).length
+    })
+  } catch(e) { res.status(500).json({ error: e.message }) }
 })
 
 // USERS - update onboarded/notifications
