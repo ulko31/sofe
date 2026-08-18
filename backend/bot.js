@@ -7,7 +7,7 @@ const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: true })
 const MINI_APP_URL = process.env.MINI_APP_URL || 'https://your-app.vercel.app'
 const GROQ_TOKEN = process.env.GROQ_TOKEN || process.env.HF_TOKEN
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
-const MODEL = 'llama-3.3-70b-versatile'
+const MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct'
 
 // ── Клавиатура ────────────────────────────────────────────
 const mainKeyboard = {
