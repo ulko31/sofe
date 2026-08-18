@@ -4,7 +4,7 @@ import api from '../utils/api'
 
 const GROQ_TOKEN = import.meta.env.VITE_GROQ_TOKEN
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
-const MODEL = 'llama-3.1-8b-instant'
+const MODEL = 'qwen/qwen3.6-27b'
 
 function buildSystemPrompt(user, consumed, eventsText) {
   return `Ты SOFE — персональный ИИ-ассистент по здоровью и питанию. Ты дружелюбная, заботливая и мотивирующая подруга-эксперт.
