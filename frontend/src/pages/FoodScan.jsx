@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useTelegram } from '../hooks/useTelegram'
-import { addMeal } from '../utils/api'
+import { addMeal, searchCatalog, lookupProductCode } from '../utils/api'
+import { normalizeProductCode } from '../utils/productCode'
 
 export default function FoodScan({ onBack, onMealAdded }) {
   const { haptic } = useTelegram()
@@ -70,75 +71,39 @@ export default function FoodScan({ onBack, onMealAdded }) {
     const imgData = canvas.toDataURL('image/jpeg', 0.92)
     stopCamera(); setScanning(false); setProcessing(true)
 
-    const groqToken = import.meta.env.VITE_GROQ_TOKEN
-    if (!groqToken) {
-      setBarcodeImage(imgData); setManualBarcode(''); setMode('barcode_manual'); setProcessing(false); return
-    }
-
     try {
-      const base64 = imgData.split(',')[1]
-      // Ask AI to recognize the product from photo — name AND nutrition
-      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${groqToken}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'meta-llama/llama-4-scout-17b-16e-instruct',
-          messages: [{ role: 'user', content: [
-            { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64}`, detail: 'high' } },
-            { type: 'text', text: 'This is a food product photo. Identify the product name and its nutrition per 100g. Reply ONLY with JSON: {"name":"product name in Russian","brand":"brand if visible","calories":number,"protein":number,"fat":number,"carbs":number}. Use nutrition label if visible, otherwise estimate.' }
-          ]}],
-          max_tokens: 150, temperature: 0
-        })
-      })
-      const data = await res.json()
-      const text = data.choices?.[0]?.message?.content?.trim() || ''
-      const match = text.match(/\{[^{}]+\}/)
-      if (match) {
-        const p = JSON.parse(match[0])
-        if (p.name && p.calories > 0) {
-          setResult({
-            source: 'barcode',
-            name: p.name,
-            brand: p.brand || '',
-            calories: Math.round(p.calories),
-            protein: Math.round((p.protein || 0) * 10) / 10,
-            fat: Math.round((p.fat || 0) * 10) / 10,
-            carbs: Math.round((p.carbs || 0) * 10) / 10,
-            unit_weight: 100,
-            imageFile: imgData
-          })
-          setEditName(p.name)
-          setEditCal(Math.round(p.calories))
-          setProcessing(false)
-          return
-        }
-      }
-    } catch(e) {}
-
-    // Fallback — manual input
+      const { BrowserMultiFormatReader } = await import('@zxing/browser')
+      const reader = new BrowserMultiFormatReader()
+      const decoded = await reader.decodeFromImageUrl(imgData)
+      const code = normalizeProductCode(decoded.getText())
+      if (!code) throw new Error('unsupported_code')
+      await lookupBarcode(code)
+      return
+    } catch(e) {
+      setError(e.message === 'unsupported_code' ? 'Этот QR-код не содержит код продукта. Наведи камеру на полосатый штрихкод.' : 'Не удалось прочитать код. Сфотографируй штрихкод крупнее или введи цифры вручную.')
+    }
     setBarcodeImage(imgData); setManualBarcode(''); setMode('barcode_manual'); setProcessing(false)
   }
 
   const lookupBarcode = async (barcode) => {
-    const code = barcode.replace(/[^0-9]/g, '')
-    if (!code) return
+    const code = normalizeProductCode(barcode)
+    if (!code) { setError('Введи 8, 12, 13 или 14 цифр штрихкода.'); return }
     setProcessing(true); setError(null)
     try {
-      // Route through backend — it handles local DB + OFF with proper headers
-      const apiUrl = import.meta.env.VITE_API_URL || 'https://sofe-1615.onrender.com/api'
-      const r = await fetch(`${apiUrl}/barcode/${code}`)
-      const data = await r.json()
+      const response = await lookupProductCode(code)
+      const data = response.data
       if (data.found) {
         setResult({ source: 'barcode', ...data, unit_weight: 100 })
-        setEditName(data.name)
-        setEditCal(data.calories)
-        setProcessing(false); return
+        setEditName(data.name); setEditCal(data.calories)
+        setMode(null)
+      } else {
+        setBarcodeCode(code); setMode('barcode_name_search')
+        if (data.reason === 'nutrition_missing') setError('Продукт найден, но КБЖУ не заполнены. Найди аналог по названию или используй фото этикетки.')
       }
-    } catch(e) {}
-    // Not found anywhere
-    setBarcodeCode(code)
-    setMode('barcode_name_search')
-    setProcessing(false)
+    } catch(e) {
+      setError(e.response?.data?.error || 'Не удалось связаться с каталогом. Повтори поиск.')
+      setMode('barcode_manual'); setManualBarcode(code)
+    } finally { setProcessing(false) }
   }
 
   // ── PHOTO ─────────────────────────────────────────────────
@@ -169,9 +134,10 @@ export default function FoodScan({ onBack, onMealAdded }) {
       const jsonMatch = text.match(/\{[^{}]+\}/)
       if (!jsonMatch) throw new Error('no_json')
       const parsed = JSON.parse(jsonMatch[0])
+      if (!Number.isFinite(Number(parsed.calories)) || Number(parsed.calories) < 0) throw new Error('no_json')
       const res = {
         source: 'photo', name: parsed.name || 'Блюдо',
-        calories: Math.round(parsed.calories) || 200,
+        calories: Math.round(parsed.calories),
         protein: Math.round((parsed.protein || 0) * 10) / 10,
         fat: Math.round((parsed.fat || 0) * 10) / 10,
         carbs: Math.round((parsed.carbs || 0) * 10) / 10,
@@ -202,53 +168,17 @@ export default function FoodScan({ onBack, onMealAdded }) {
     })
   }
 
-  const searchByName = async (q) => {
-    if (!q || q.length < 2) return
-    setNameSearching(true)
+  const searchByName = async (text) => {
+    if (text.trim().length < 2) return
+    setNameSearching(true); setError(null)
     try {
-      // Search via backend (handles CORS and OFF properly)
-      const apiUrl = import.meta.env.VITE_API_URL || 'https://sofe-1615.onrender.com/api'
-      const r = await fetch(`${apiUrl}/food-search?q=${encodeURIComponent(q)}`)
-      const products = await r.json()
-      if (Array.isArray(products) && products.length > 0) {
-        setNameResults(products.slice(0, 20))
-        setNameSearching(false)
-        return
-      }
-    } catch(e) {}
-
-    // Fallback: ask Groq AI for nutrition info
-    try {
-      const groqToken = import.meta.env.VITE_GROQ_TOKEN
-      if (!groqToken) { setNameResults([]); setNameSearching(false); return }
-      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${groqToken}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
-          messages: [{ role: 'user', content: `Дай КБЖУ на 100г для "${q}". Ответь ТОЛЬКО JSON массивом 1-3 вариантов: [{"name":"точное название","calories":число,"protein":г,"fat":г,"carbs":г}]. Без пояснений.` }],
-          max_tokens: 200, temperature: 0
-        })
-      })
-      const data = await res.json()
-      const text = data.choices?.[0]?.message?.content?.trim() || ''
-      const match = text.match(/\[[\s\S]*\]/)
-      if (match) {
-        const items = JSON.parse(match[0])
-        setNameResults(items.map((item, i) => ({
-          id: 'ai_' + i,
-          name: item.name,
-          brand: '🤖 ИИ',
-          calories: Math.round(item.calories || 0),
-          protein: Math.round((item.protein || 0) * 10) / 10,
-          fat: Math.round((item.fat || 0) * 10) / 10,
-          carbs: Math.round((item.carbs || 0) * 10) / 10,
-        })))
-      } else {
-        setNameResults([])
-      }
-    } catch(e) { setNameResults([]) }
-    setNameSearching(false)
+      const response = await searchCatalog(text.trim())
+      setNameResults(response.data || [])
+      if (!response.data?.length) setError('Продукт не найден. Попробуй другое название или фото этикетки.')
+    } catch(e) {
+      setNameResults([])
+      setError(e.response?.data?.error || 'Каталог временно недоступен.')
+    } finally { setNameSearching(false) }
   }
 
   const selectNameResult = (item) => {
@@ -258,23 +188,26 @@ export default function FoodScan({ onBack, onMealAdded }) {
   }
 
   const handleAddMeal = async () => {
-    if (!result) return; haptic('medium')
+    if (!result) return
+    if (result.nutrition_complete === false) { setError('В каталоге не все БЖУ заполнены. Используй фото этикетки или другой продукт.'); return }
+    if (!Number.isFinite(Number(weight)) || Number(weight) <= 0) { setError('Укажи вес больше нуля.'); return }
+    haptic('medium')
     const w = parseFloat(weight) || 100
     const ratio = w / (result.unit_weight || 100)
     try {
       await addMeal({
         name: editName || result.name,
-        calories: Math.round((editCal || result.calories) * ratio),
-        protein: Math.round(result.protein * ratio * 10) / 10,
-        fat: Math.round(result.fat * ratio * 10) / 10,
-        carbs: Math.round(result.carbs * ratio * 10) / 10,
+        calories: Math.round((Number.isFinite(Number(editCal)) ? Number(editCal) : result.calories) * ratio),
+        protein: Math.round((result.protein ?? 0) * ratio * 10) / 10,
+        fat: Math.round((result.fat ?? 0) * ratio * 10) / 10,
+        carbs: Math.round((result.carbs ?? 0) * ratio * 10) / 10,
         type: mealType, date: (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` })()
       })
       onMealAdded?.(); haptic('medium'); onBack()
     } catch(e) { setError('Ошибка при добавлении.') }
   }
 
-  const calcCal = () => result ? Math.round((editCal || result.calories) * (parseFloat(weight) || 100) / (result.unit_weight || 100)) : 0
+  const calcCal = () => result ? Math.round((Number.isFinite(Number(editCal)) ? Number(editCal) : result.calories) * (parseFloat(weight) || 100) / (result.unit_weight || 100)) : 0
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: 'var(--bg)' }}>
@@ -297,7 +230,7 @@ export default function FoodScan({ onBack, onMealAdded }) {
             <div style={{ background: 'var(--white)', borderRadius: 'var(--radius)', padding: 20, border: '2px dashed var(--pink-mid)' }}>
               <div style={{ fontSize: 40, marginBottom: 8, textAlign: 'center' }}>📸</div>
               <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 4, textAlign: 'center' }}>Сфотографировать блюдо</div>
-              <div style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center', marginBottom: 14 }}>ИИ определит калории и БЖУ</div>
+              <div style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center', marginBottom: 14 }}>Оценка КБЖУ на 100 г — подтверди состав и вес</div>
               <div style={{ display: 'flex', gap: 10 }}>
                 <button onClick={() => fileEnvRef.current?.click()}
                   style={{ flex: 1, padding: 10, borderRadius: 10, background: 'var(--pink)', color: 'white', border: 'none', fontFamily: 'Nunito, sans-serif', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>📷 Камера</button>
@@ -309,8 +242,8 @@ export default function FoodScan({ onBack, onMealAdded }) {
             <div onClick={startBarcodeCamera}
               style={{ background: 'var(--white)', borderRadius: 'var(--radius)', padding: 24, textAlign: 'center', cursor: 'pointer', border: '2px dashed var(--green-mid)' }}>
               <div style={{ fontSize: 48, marginBottom: 12 }}>📦</div>
-              <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 4 }}>Сфотографировать продукт</div>
-              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>ИИ распознает название и КБЖУ с упаковки</div>
+              <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 4 }}>Сканировать штрихкод</div>
+              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Наведи камеру на штрихкод продукта</div>
             </div>
 
             <div className="card" style={{ padding: 16 }}>
@@ -344,10 +277,10 @@ export default function FoodScan({ onBack, onMealAdded }) {
               </div>
             </div>
             <div style={{ textAlign: 'center', padding: '10px 0 14px', color: 'var(--text-muted)', fontSize: 13 }}>
-              Наведи камеру на упаковку продукта
+              Наведи камеру на полосатый штрихкод или GS1 QR-код
             </div>
             <button className="btn-primary" style={{ marginBottom: 10, fontSize: 16 }} onClick={captureBarcode}>
-              📸 Распознать продукт
+              📸 Прочитать код
             </button>
             <button className="btn-outline" onClick={() => { stopCamera(); setMode(null); setScanning(false) }}>Отмена</button>
           </div>
@@ -447,35 +380,20 @@ export default function FoodScan({ onBack, onMealAdded }) {
                   <img src={result.imageFile || result.image} alt="" style={{ width: 70, height: 70, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }} />
                 )}
                 <div style={{ flex: 1 }}>
-                  <input value={editName} onChange={e => {
-                    const n = e.target.value; setEditName(n)
-                    if (result.source === 'photo' && n.length > 2) {
-                      clearTimeout(recalcTimeout)
-                      setRecalcTimeout(setTimeout(async () => {
-                        const token = import.meta.env.VITE_GROQ_TOKEN; if (!token) return
-                        try {
-                          const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-                            method: 'POST',
-                            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: [{ role: 'user', content: `Калории на 100г для "${n}"? Ответь ТОЛЬКО числом.` }], max_tokens: 10, temperature: 0 })
-                          })
-                          const d = await r.json(); const cal = parseInt(d.choices?.[0]?.message?.content?.trim())
-                          if (!isNaN(cal) && cal > 0) setEditCal(cal)
-                        } catch(e) {}
-                      }, 800))
-                    }
-                  }}
+                  <input value={editName} onChange={e => setEditName(e.target.value)}
                     style={{ fontSize: 15, fontWeight: 800, border: 'none', borderBottom: '1.5px solid var(--pink-mid)', background: 'transparent', width: '100%', padding: '2px 0', fontFamily: 'Nunito, sans-serif', marginBottom: 4 }} />
                   {result.brand && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{result.brand}</div>}
                   {result.source === 'photo' && <div style={{ fontSize: 11, color: 'var(--green)', fontWeight: 700 }}>🤖 ИИ · можно исправить название</div>}
+                  {result.source === 'openfoodfacts' && <a href="https://world.openfoodfacts.org/" target="_blank" rel="noreferrer" style={{ fontSize: 11 }}>Open Food Facts · сверь с этикеткой</a>}
+                  {result.nutrition_complete === false && <div style={{ fontSize: 11 }}>БЖУ заполнены не полностью</div>}
                   {result.barcode && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>📦 {result.barcode}</div>}
                 </div>
               </div>
 
               <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-                {[['Калории', editCal || result.calories, 'ккал', 'var(--pink)'], ['Белки', result.protein, 'г', '#3498DB'], ['Жиры', result.fat, 'г', '#FF9800'], ['Углеводы', result.carbs, 'г', 'var(--green)']].map(([l, v, u, c]) => (
+                {[['Калории', Number(editCal), 'ккал', 'var(--pink)'], ['Белки', result.protein, 'г', '#3498DB'], ['Жиры', result.fat, 'г', '#FF9800'], ['Углеводы', result.carbs, 'г', 'var(--green)']].map(([l, v, u, c]) => (
                   <div key={l} style={{ flex: 1, textAlign: 'center', background: 'var(--bg)', borderRadius: 8, padding: '8px 4px' }}>
-                    <div style={{ fontSize: 15, fontWeight: 900, color: c }}>{v}</div>
+                    <div style={{ fontSize: 15, fontWeight: 900, color: c }}>{v ?? '—'}</div>
                     <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 2 }}>{l}/{u}</div>
                   </div>
                 ))}

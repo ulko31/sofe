@@ -62,3 +62,6 @@ export const addWorkout = (data) => api.post('/workouts/my', data)
 export const getSubscriptions = () => api.get('/subscriptions')
 export const getRecipes = () => api.get('/recipes')
 export const getProgress = () => api.get('/progress')
+
+export const searchCatalog = (q) => api.get('/food-search', { params: { q } })
+export const lookupProductCode = (code) => api.get(`/barcode/${encodeURIComponent(code)}`)

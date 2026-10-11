@@ -1,3 +1,4 @@
+import baseFoods from '../data/foods.json'
 export const COMMON_FOODS = [
   // Молочные
   { id: 'l1', name: 'Молоко 2.5%', calories: 52, protein: 2.8, fat: 2.5, carbs: 4.7, unit: '100мл', unit_weight: 100 },
@@ -289,8 +290,13 @@ export const COMMON_FOODS = [
   { id: 'rd23', name: 'Роллы Филадельфия', calories: 175, protein: 8, fat: 7, carbs: 20, unit: '6 шт', unit_weight: 120 },
 ]
 
+const normalize = value => String(value || '').toLowerCase().replace(/ё/g, 'е').replace(/[^a-zа-я0-9%]+/g, ' ').trim()
 export function searchLocalFoods(query) {
-  if (!query || query.length < 1) return []
-  const q = query.toLowerCase()
-  return COMMON_FOODS.filter(f => f.name.toLowerCase().includes(q)).slice(0, 12)
+  const words = normalize(query).split(' ').filter(Boolean)
+  if (!words.length) return []
+  const seen = new Set()
+  return [...baseFoods, ...COMMON_FOODS.map(f => ({ ...f, unit_weight: 100, unit: f.unit.includes('мл') ? '100мл' : '100г' }))]
+    .filter(f => words.every(w => normalize(f.name).includes(w)))
+    .filter(f => { const key = normalize(f.name); if (seen.has(key)) return false; seen.add(key); return true })
+    .slice(0, 40)
 }

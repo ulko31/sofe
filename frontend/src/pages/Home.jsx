@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { getTodayStats, getTrackers, getMeals, updateTracker, addMeal, deleteMeal, searchFoods } from '../utils/api'
+import { getTodayStats, getTrackers, getMeals, updateTracker, addMeal, deleteMeal, searchFoods, searchCatalog } from '../utils/api'
 import { searchLocalFoods } from '../utils/commonFoods'
 import { useTelegram } from '../hooks/useTelegram'
 import FoodScan from './FoodScan'
@@ -59,62 +59,51 @@ export default function Home({ user, onOpenAI, onTabChange }) {
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [user])
 
-  // Debounced food search
+  // Search the reference catalogue while typing. Query the external catalogue only on submit.
+  const searchVersion = useRef(0)
+  const latestQuery = useRef(query)
+  latestQuery.current = query
+  const [foodSearchError, setFoodSearchError] = useState('')
   useEffect(() => {
-    if (!query.trim() || query.length < 1) {
-      setSearchResults([])
-      return
-    }
-    clearTimeout(searchTimeout.current)
-    // Show local results immediately
-    const localResults = searchLocalFoods(query)
-    setSearchResults(localResults)
-    setSearching(true)
-    searchTimeout.current = setTimeout(async () => {
+    let active = true
+    const version = ++searchVersion.current
+    setFoodSearchError('')
+    setSearching(false)
+    const local = searchLocalFoods(query)
+    setSearchResults(local)
+    if (!query.trim() || selectedFood) return
+    const timer = setTimeout(async () => {
       try {
-        // Search OFF directly from browser
-        let offFoods = []
-        try {
-          const r = await fetch(
-            `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=20&fields=product_name,product_name_ru,brands,nutriments,code`
-          )
-          const data = await r.json()
-          offFoods = (data.products || [])
-            .filter(p => p.product_name && p.nutriments?.['energy-kcal_100g'] > 0)
-            .map(p => ({
-              id: 'off_' + p.code,
-              name: (p.product_name_ru || p.product_name || '').trim(),
-              brand: (p.brands || '').split(',')[0].trim(),
-              calories: Math.round(p.nutriments['energy-kcal_100g'] || 0),
-              protein: Math.round((p.nutriments.proteins_100g || 0) * 10) / 10,
-              fat: Math.round((p.nutriments.fat_100g || 0) * 10) / 10,
-              carbs: Math.round((p.nutriments.carbohydrates_100g || 0) * 10) / 10,
-              unit: '100г', unit_weight: 100
-            }))
-        } catch(e) {}
-
-        // Also search backend DB
-        let backendFoods = []
-        try { const res = await searchFoods(query); backendFoods = res.data || [] } catch(e) {}
-
-        // Merge & deduplicate by name
-        const seen = new Set()
-        const merged = [...backendFoods, ...offFoods, ...localResults].filter(f => {
-          const key = (f.name || '').toLowerCase().trim()
-          if (!key || key.length < 2 || seen.has(key)) return false
-          seen.add(key)
-          return true
-        })
-        setSearchResults(merged.slice(0, 40))
-      } catch(e) {
-        setSearchResults(localResults)
-      } finally {
-        setSearching(false)
-      }
+        const res = await searchFoods(query)
+        if (active && searchVersion.current === version) setSearchResults(mergeFoods(res.data || [], local))
+      } catch {}
     }, 400)
-  }, [query])
+    return () => { active = false; clearTimeout(timer) }
+  }, [query, selectedFood])
+
+  function mergeFoods(...groups) {
+    const seen = new Set()
+    return groups.flat().filter(f => {
+      const key = `${f.name} ${f.brand || ''}`.toLowerCase().replace(/ё/g, 'е').trim()
+      if (seen.has(key)) return false
+      seen.add(key); return true
+    }).slice(0, 60)
+  }
+  const searchFullCatalog = async () => {
+    const text = query.trim()
+    if (text.length < 2) return
+    const version = ++searchVersion.current
+    setSearching(true); setFoodSearchError('')
+    try {
+      const res = await searchCatalog(text)
+      if (latestQuery.current.trim() === text && searchVersion.current === version) setSearchResults(mergeFoods(res.data || [], searchLocalFoods(text)))
+    } catch {
+      if (latestQuery.current.trim() === text && searchVersion.current === version) setFoodSearchError('Каталог временно недоступен. Можно выбрать продукт из справочника или повторить поиск.')
+    } finally { if (latestQuery.current.trim() === text && searchVersion.current === version) setSearching(false) }
+  }
 
   const handleSelectFood = (food) => {
+    if (food.nutrition_complete === false) { setFoodSearchError('У продукта не заполнены все БЖУ. Выбери другой результат или используй фото этикетки.'); return }
     haptic('light')
     setSelectedFood(food)
     setQuery(food.name)
@@ -126,13 +115,13 @@ export default function Home({ user, onOpenAI, onTabChange }) {
   const calcCalories = () => {
     if (!selectedFood) return ''
     const w = parseFloat(weight) || 0
-    return Math.round((selectedFood.calories * w) / (selectedFood.unit_weight || 100))
+    return Math.round((selectedFood.calories * w) / 100)
   }
 
   const calcMacro = (field) => {
     if (!selectedFood) return 0
     const w = parseFloat(weight) || 0
-    return Math.round((selectedFood[field] * w) / (selectedFood.unit_weight || 100) * 10) / 10
+    return Math.round((selectedFood[field] * w) / 100 * 10) / 10
   }
 
   const handleAddMeal = async () => {
@@ -450,6 +439,7 @@ export default function Home({ user, onOpenAI, onTabChange }) {
                 placeholder="Введи название продукта или блюда..."
                 value={query}
                 onChange={e => { setQuery(e.target.value); setSelectedFood(null) }}
+                onKeyDown={e => { if (e.key === 'Enter') searchFullCatalog() }}
                 style={{ paddingLeft: 38, fontSize: 14 }}
                 autoFocus
               />
@@ -460,6 +450,10 @@ export default function Home({ user, onOpenAI, onTabChange }) {
               )}
             </div>
 
+            <button type="button" className="btn-outline" disabled={searching || query.trim().length < 2} onClick={searchFullCatalog} style={{ marginBottom: 8 }}>
+              {searching ? 'Ищем…' : 'Найти в каталоге продуктов'}
+            </button>
+            {foodSearchError && <div role="status" style={{ fontSize: 12, marginBottom: 8 }}>{foodSearchError}</div>}
             {/* Search results */}
             {searchResults.length > 0 && (
               <div style={{ background: 'var(--bg)', borderRadius: 'var(--radius-sm)', marginBottom: 12, maxHeight: 200, overflowY: 'auto' }}>
