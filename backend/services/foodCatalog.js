@@ -1,4 +1,5 @@
-const reference = require('../data/foods.json')
+const reference = [...require('../data/foods.json'), ...require('../data/brandedFoods.json')]
+const localBarcodes = new Map(reference.filter(p => p.id.startsWith('off_')).map(p => [p.barcode || p.id.slice(4), p]))
 const normalize = value => String(value || '').toLowerCase().replace(/ё/g, 'е').replace(/[^a-zа-я0-9%]+/g, ' ').trim()
 function searchReference(query, rows = []) {
   const words = normalize(query).split(' ').filter(Boolean)
@@ -59,6 +60,7 @@ function createRemoteCatalog(fetcher = fetch) {
       return (data.products || []).map(mapProduct).filter(Boolean)
     },
     async barcode(code) {
+      if (localBarcodes.has(code)) return { found: true, barcode: code, ...localBarcodes.get(code) }
       const data = await request(`barcode:${code}`, `https://world.openfoodfacts.org/api/v3/product/${code}.json`, 'product')
       if (!data.product) return { found: false, barcode: code }
       const product = mapProduct({ ...data.product, code })
