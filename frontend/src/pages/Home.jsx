@@ -465,6 +465,7 @@ export default function Home({ user, onOpenAI, onTabChange }) {
                   >
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 700 }}>{food.name}</div>
+                      {food.brand && <div style={{ fontSize: 11 }}>{food.brand}</div>}
                       <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                         Б:{food.protein}г · Ж:{food.fat}г · У:{food.carbs}г
                       </div>

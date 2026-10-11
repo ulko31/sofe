@@ -4,7 +4,7 @@ function searchReference(query, rows = []) {
   const words = normalize(query).split(' ').filter(Boolean)
   if (!words.length) return []
   const seen = new Set()
-  return [...reference, ...rows.map(f => ({ ...f, unit_weight: 100, source: 'sofe_reference' }))]
+  return [...reference, ...rows.map(f => ({ ...f, unit_weight: 100, source: f.source || 'sofe_reference' }))]
     .filter(f => words.every(w => normalize(`${f.name} ${f.brand || ''}`).includes(w)))
     .filter(f => { const key = normalize(`${f.name} ${f.brand || ''}`); if (seen.has(key)) return false; seen.add(key); return true })
     .sort((a,b) => normalize(a.name).indexOf(words[0]) - normalize(b.name).indexOf(words[0]))

@@ -39,3 +39,9 @@ test('barcode lookup never invents codes and exposes incomplete nutrition', asyn
   assert.equal(urls.length,1)
   assert.ok(urls[0].endsWith('/012345678905.json'))
 })
+
+test('imported brands are searchable offline by name and brand', () => {
+  assert.ok(searchReference('молоко простоквашино').length >= 2)
+  assert.ok(searchReference('белевская пастила').length >= 2)
+  assert.ok(searchReference('простоквашино').some(f => f.source === 'openfoodfacts'))
+})
