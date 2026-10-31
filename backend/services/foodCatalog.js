@@ -11,17 +11,17 @@ function searchReference(query, rows = []) {
     .sort((a,b) => normalize(a.name).indexOf(words[0]) - normalize(b.name).indexOf(words[0]))
     .slice(0, 40)
 }
-function mapProduct(p) {
+function mapProduct(p, allowIncomplete = false) {
   const n = p.nutriments || {}
   const name = (p.product_name_ru || p.product_name || '').trim()
   const read = key => { const v=n[key]; return v !== undefined && v !== null && v !== '' && Number.isFinite(Number(v)) && Number(v)>=0 ? Number(v) : null }
   let calories = read('energy-kcal_100g')
   if (calories === null && read('energy-kj_100g') !== null) calories = read('energy-kj_100g') / 4.184
-  if (!name || calories === null) return null
-  return { id: `off_${p.code}`, name, brand: (p.brands || '').split(',')[0].trim(), calories: Math.round(calories),
+  if (!name || (calories === null && !allowIncomplete)) return null
+  return { id: `off_${p.code}`, name, brand: (p.brands || '').split(',')[0].trim(), calories: calories === null ? null : Math.round(calories),
     protein: read('proteins_100g'), fat: read('fat_100g'), carbs: read('carbohydrates_100g'),
     unit: '100г', unit_weight: 100, source: 'openfoodfacts', image: p.image_front_small_url || null,
-    nutrition_complete: ['proteins_100g','fat_100g','carbohydrates_100g'].every(k => read(k) !== null) }
+    nutrition_complete: calories !== null && ['proteins_100g','fat_100g','carbohydrates_100g'].every(k => read(k) !== null) }
 }
 function normalizeBarcode(value) {
   const text = String(value || '').trim()
@@ -57,13 +57,13 @@ function createRemoteCatalog(fetcher = fetch) {
   return {
     async search(query) {
       const data = await request(`search:${normalize(query)}`, `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=40&fields=code,product_name,product_name_ru,brands,nutriments`, 'search')
-      return (data.products || []).map(mapProduct).filter(Boolean)
+      return (data.products || []).map(p => mapProduct(p)).filter(Boolean)
     },
     async barcode(code) {
       if (localBarcodes.has(code)) return { found: true, barcode: code, ...localBarcodes.get(code) }
       const data = await request(`barcode:${code}`, `https://world.openfoodfacts.org/api/v3/product/${code}.json`, 'product')
       if (!data.product) return { found: false, barcode: code }
-      const product = mapProduct({ ...data.product, code })
+      const product = mapProduct({ ...data.product, code }, true)
       return product ? { found:true, barcode:code, ...product } : { found:false, barcode:code, reason:'nutrition_missing' }
     }
   }

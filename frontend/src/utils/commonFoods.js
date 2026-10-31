@@ -295,7 +295,8 @@ export function searchLocalFoods(query) {
   const words = normalize(query).split(' ').filter(Boolean)
   if (!words.length) return []
   const seen = new Set()
-  return [...baseFoods, ...COMMON_FOODS.map(f => ({ ...f, unit_weight: 100, unit: f.unit.includes('мл') ? '100мл' : '100г' }))]
+  return [...baseFoods, ...COMMON_FOODS.filter(f => f && typeof f.name === 'string').map(f => ({ ...f, unit_weight: 100, unit: String(f.unit || '').includes('мл') ? '100мл' : '100г' }))]
+    .filter(f => f && typeof f.name === 'string')
     .filter(f => words.every(w => normalize(`${f.name} ${f.brand || ''}`).includes(w)))
     .filter(f => { const key = normalize(f.name); if (seen.has(key)) return false; seen.add(key); return true })
     .slice(0, 40)
