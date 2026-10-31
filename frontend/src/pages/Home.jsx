@@ -258,7 +258,7 @@ export default function Home({ user, onOpenAI, onTabChange }) {
       </div>
 
       {/* Calories card */}
-      <div style={{ background: 'linear-gradient(135deg, #D24C70 0%, #AE3658 100%)', borderRadius: 'var(--radius)', padding: 18, color: 'white', position: 'relative', overflow: 'hidden', boxShadow: '0 12px 30px rgba(174,54,88,0.18)' }}>
+      <div style={{ background: 'linear-gradient(135deg, #242824 0%, #3B4038 100%)', borderRadius: 'var(--radius)', padding: 18, color: 'white', position: 'relative', overflow: 'hidden', boxShadow: '0 14px 34px rgba(36,40,36,0.2)' }}>
         <div style={{ position: 'absolute', right: -20, top: -20, width: 100, height: 100, borderRadius: '50%', background: 'rgba(255,255,255,0.1)' }} />
         <div style={{ position: 'absolute', right: 20, bottom: -30, width: 80, height: 80, borderRadius: '50%', background: 'rgba(255,255,255,0.08)' }} />
         <div style={{ display: 'flex', justifyContent: 'space-between', position: 'relative', zIndex: 1 }}>
@@ -274,7 +274,7 @@ export default function Home({ user, onOpenAI, onTabChange }) {
           </div>
         </div>
         <div style={{ height: 6, background: 'rgba(255,255,255,0.3)', borderRadius: 3, margin: '12px 0 10px', position: 'relative', zIndex: 1 }}>
-          <div style={{ height: '100%', background: 'white', borderRadius: 3, width: `${progress}%`, transition: 'width 0.5s' }} />
+          <div style={{ height: '100%', background: '#C7E86D', borderRadius: 3, width: `${progress}%`, transition: 'width 0.5s' }} />
         </div>
         <div style={{ display: 'flex', gap: 16, position: 'relative', zIndex: 1 }}>
           {[['Сожжено', stats.burned || 0, 'ккал'], ['Белки', Math.round(stats.protein || 0), 'г'], ['Жиры', Math.round(stats.fat || 0), 'г'], ['Углеводы', Math.round(stats.carbs || 0), 'г']].map(([l, v, u]) => (

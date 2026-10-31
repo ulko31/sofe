@@ -52,10 +52,10 @@ export default function BottomNav({ active, onChange }) {
     <nav style={{
       position: 'fixed',
       bottom: 0, left: 0, right: 0,
-      background: 'rgba(255,255,255,0.95)',
+      background: 'rgba(255,252,246,0.96)',
       backdropFilter: 'blur(10px)',
       WebkitBackdropFilter: 'blur(10px)',
-      borderTop: '0.5px solid rgba(0,0,0,0.08)',
+      borderTop: '0.5px solid rgba(36,39,34,0.1)',
       display: 'flex',
       padding: '6px 0 max(10px, env(safe-area-inset-bottom))',
       zIndex: 100,

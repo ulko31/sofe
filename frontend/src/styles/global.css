@@ -1,17 +1,17 @@
 :root {
-  --pink: #D24C70;
-  --pink-light: #F8E8ED;
-  --pink-mid: #EAB4C3;
-  --pink-dark: #A93354;
-  --green: #9BCB4B;
-  --green-light: #EEF6DF;
-  --green-mid: #CBE49E;
-  --green-dark: #4B6B20;
-  --bg: #F5F1E9;
-  --white: #FFFEFB;
-  --text: #20221F;
-  --text-muted: #73766E;
-  --border: #E5E0D7;
+  --pink: #C9486B;
+  --pink-light: #F6E3E9;
+  --pink-mid: #E8AFC0;
+  --pink-dark: #96334F;
+  --green: #AFD64E;
+  --green-light: #EFF6D8;
+  --green-mid: #D0E79A;
+  --green-dark: #50691C;
+  --bg: #F3EEE5;
+  --white: #FFFCF6;
+  --text: #242722;
+  --text-muted: #72766D;
+  --border: #DDD8CF;
   --radius: 14px;
   --radius-sm: 10px;
   --radius-xs: 6px;
@@ -86,6 +86,7 @@ button:active { transform: scale(0.97); }
   border-radius: var(--radius);
   border: 0.5px solid var(--border);
   padding: 16px;
+  box-shadow: 0 5px 18px rgba(42, 45, 41, 0.035);
 }
 
 /* Screen layout */
