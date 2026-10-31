@@ -258,7 +258,7 @@ export default function Home({ user, onOpenAI, onTabChange }) {
       </div>
 
       {/* Calories card */}
-      <div style={{ background: 'var(--pink)', borderRadius: 'var(--radius)', padding: 18, color: 'white', position: 'relative', overflow: 'hidden' }}>
+      <div style={{ background: 'linear-gradient(135deg, #D24C70 0%, #AE3658 100%)', borderRadius: 'var(--radius)', padding: 18, color: 'white', position: 'relative', overflow: 'hidden', boxShadow: '0 12px 30px rgba(174,54,88,0.18)' }}>
         <div style={{ position: 'absolute', right: -20, top: -20, width: 100, height: 100, borderRadius: '50%', background: 'rgba(255,255,255,0.1)' }} />
         <div style={{ position: 'absolute', right: 20, bottom: -30, width: 80, height: 80, borderRadius: '50%', background: 'rgba(255,255,255,0.08)' }} />
         <div style={{ display: 'flex', justifyContent: 'space-between', position: 'relative', zIndex: 1 }}>
@@ -289,7 +289,7 @@ export default function Home({ user, onOpenAI, onTabChange }) {
       {/* Trackers */}
       <div>
         {/* AI Assistant quick access */}
-        <div onClick={() => onOpenAI?.()} style={{ background: '#EAF3DE', borderRadius: 'var(--radius)', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', marginBottom: 4 }}>
+        <div onClick={() => onOpenAI?.()} style={{ background: 'var(--green-light)', borderRadius: 'var(--radius)', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', marginBottom: 4 }}>
           <div style={{ width: 44, height: 44, flexShrink: 0, background: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <img src="/mascot.svg" alt="SOFE" style={{ width: '85%', height: '85%', objectFit: 'contain' }} />
             </div>

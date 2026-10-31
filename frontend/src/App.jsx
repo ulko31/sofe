@@ -13,6 +13,7 @@ import AIAssistant from './pages/AIAssistant'
 
 export default function App() {
   const { user } = useTelegram()
+  const designPreview = new URLSearchParams(window.location.search).has('designPreview')
   const [tab, setTab] = useState('home')
   const [prevTab, setPrevTab] = useState(null)
 
@@ -21,13 +22,14 @@ export default function App() {
     setTab(newTab)
   }
   const [showAI, setShowAI] = useState(false)
-  const [appUser, setAppUser] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [appUser, setAppUser] = useState(designPreview ? { name: 'Ульяна', calories: 2000, onboarded: true } : null)
+  const [loading, setLoading] = useState(!designPreview)
   const [needsOnboarding, setNeedsOnboarding] = useState(false)
   const [pendingFriendToken, setPendingFriendToken] = useState(null)
 
   // Load user
   useEffect(() => {
+    if (designPreview) return
     if (!user) return
     getMe()
       .then(r => {
@@ -36,11 +38,12 @@ export default function App() {
         setLoading(false)
       })
       .catch(() => { setNeedsOnboarding(true); setLoading(false) })
-  }, [user])
+  }, [user, designPreview])
 
   useEffect(() => {
+    if (designPreview) return
     if (!window.Telegram?.WebApp?.initData) setLoading(false)
-  }, [])
+  }, [designPreview])
 
   // Check friend invite on start
   useEffect(() => {

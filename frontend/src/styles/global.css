@@ -1,21 +1,21 @@
 :root {
-  --pink: #E8437A;
-  --pink-light: #FBEAF0;
-  --pink-mid: #F4C0D1;
-  --pink-dark: #C2305E;
-  --green: #4CAF50;
-  --green-light: #EAF3DE;
-  --green-mid: #C0DD97;
-  --green-dark: #3B6D11;
-  --bg: #F7F5F0;
-  --white: #FFFFFF;
-  --text: #1A1A1A;
-  --text-muted: #888780;
-  --border: #EEEEEE;
-  --radius: 16px;
+  --pink: #D24C70;
+  --pink-light: #F8E8ED;
+  --pink-mid: #EAB4C3;
+  --pink-dark: #A93354;
+  --green: #9BCB4B;
+  --green-light: #EEF6DF;
+  --green-mid: #CBE49E;
+  --green-dark: #4B6B20;
+  --bg: #F5F1E9;
+  --white: #FFFEFB;
+  --text: #20221F;
+  --text-muted: #73766E;
+  --border: #E5E0D7;
+  --radius: 14px;
   --radius-sm: 10px;
   --radius-xs: 6px;
-  --shadow: 0 2px 12px rgba(0,0,0,0.06);
+  --shadow: 0 8px 28px rgba(55,45,36,0.07);
 }
 
 * {
@@ -30,7 +30,7 @@ html, body {
   height: 100%;
   overflow-x: hidden;
   background: var(--bg);
-  font-family: 'Nunito', sans-serif;
+  font-family: 'Manrope', sans-serif;
   color: var(--text);
   font-size: 16px;
   line-height: 1.5;
@@ -48,7 +48,7 @@ html, body {
 
 /* Buttons */
 button {
-  font-family: 'Nunito', sans-serif;
+  font-family: 'Manrope', sans-serif !important;
   cursor: pointer;
   border: none;
   background: none;
@@ -170,7 +170,7 @@ input[type="number"],
 input[type="email"],
 textarea,
 select {
-  font-family: 'Nunito', sans-serif;
+  font-family: 'Manrope', sans-serif !important;
   width: 100%;
   padding: 12px 14px;
   border: 1.5px solid var(--border);
