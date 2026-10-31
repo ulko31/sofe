@@ -65,3 +65,8 @@ export const getProgress = () => api.get('/progress')
 
 export const searchCatalog = (q) => api.get('/food-search', { params: { q } })
 export const lookupProductCode = (code) => api.get(`/barcode/${encodeURIComponent(code)}`)
+
+export const recognizeFoodPhoto = (image, intent) => api.post('/food-photo', { image, intent }, {
+  timeout: 45000,
+  headers: import.meta.env.VITE_GROQ_TOKEN ? { 'X-Sofe-Vision-Key': import.meta.env.VITE_GROQ_TOKEN } : {}
+})
