@@ -215,9 +215,18 @@ export default function Home({ user, onOpenAI, onTabChange }) {
 
   const mealOrder = ['breakfast', 'lunch', 'dinner', 'snack']
 
+  const openFoodScanner = (mode, type = addMealType) => {
+    haptic('light')
+    setAddMealType(type)
+    setScanMode(mode)
+    setShowAddMeal(false)
+    setShowScan(true)
+  }
+
   if (showScan === true) return (
     <FoodScan
       initialMode={scanMode}
+      initialMealType={addMealType}
       onBack={() => { setShowScan(false); setScanMode(null) }}
       onMealAdded={(meal) => {
         loadData()
@@ -329,15 +338,7 @@ export default function Home({ user, onOpenAI, onTabChange }) {
       <div>
         <div className="section-header">
           <h3>Питание</h3>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={() => { haptic('light'); setShowScan(true); setScanMode('photo') }} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--pink-light)', border: 'none', color: 'var(--pink)', borderRadius: 8, padding: '5px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Nunito, sans-serif' }}>
-              <i className="ti ti-camera" style={{ fontSize: 14 }} /> Фото
-            </button>
-            <button onClick={() => { haptic('light'); setShowScan(true); setScanMode('barcode') }} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--green-light)', border: 'none', color: 'var(--green-dark)', borderRadius: 8, padding: '5px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Nunito, sans-serif' }}>
-              <i className="ti ti-scan" style={{ fontSize: 14 }} /> Штрихкод
-            </button>
-            <a onClick={() => { haptic('light'); setShowAddMeal(true) }}>+ Добавить</a>
-          </div>
+          <a onClick={() => { haptic('light'); setShowAddMeal(true) }}>+ Добавить</a>
         </div>
 
         {/* Quick add buttons */}
@@ -431,7 +432,22 @@ export default function Home({ user, onOpenAI, onTabChange }) {
               ))}
             </div>
 
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8, fontWeight: 700 }}>
+              Как добавить
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
+              <button type="button" className="btn-outline" onClick={() => openFoodScanner('photo', addMealType)} style={{ margin: 0 }}>
+                <i className="ti ti-camera" style={{ marginRight: 6 }} /> По фото
+              </button>
+              <button type="button" className="btn-outline" onClick={() => openFoodScanner('barcode', addMealType)} style={{ margin: 0 }}>
+                <i className="ti ti-scan" style={{ marginRight: 6 }} /> Штрихкод
+              </button>
+            </div>
+
             {/* Search input */}
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8, fontWeight: 700 }}>
+              Или найти продукт
+            </div>
             <div style={{ position: 'relative', marginBottom: 8 }}>
               <i className="ti ti-search" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: 16 }} />
               <input

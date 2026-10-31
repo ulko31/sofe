@@ -4,14 +4,14 @@ import { addMeal, searchCatalog, lookupProductCode, recognizeFoodPhoto } from '.
 import { normalizeProductCode } from '../utils/productCode'
 import { nutrientNumber, parsePhotoNutrition } from '../utils/nutrition'
 
-export default function FoodScan({ onBack, onMealAdded }) {
+export default function FoodScan({ onBack, onMealAdded, initialMealType = 'snack', initialMode = null }) {
   const { haptic } = useTelegram()
   const [mode, setMode] = useState(null) // null | 'barcode' | 'barcode_manual' | 'photo'
   const [processing, setProcessing] = useState(false)
   const [scanning, setScanning] = useState(false)
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
-  const [mealType, setMealType] = useState('snack')
+  const [mealType, setMealType] = useState(initialMealType)
   const [weight, setWeight] = useState('100')
   const [manualBarcode, setManualBarcode] = useState('')
   const [editName, setEditName] = useState('')
@@ -21,7 +21,7 @@ export default function FoodScan({ onBack, onMealAdded }) {
   const [nameSearch, setNameSearch] = useState('')
   const [nameResults, setNameResults] = useState([])
   const [nameSearching, setNameSearching] = useState(false)
-    const photoIntentRef = useRef('dish')
+  const photoIntentRef = useRef('dish')
   const fileEnvRef = useRef(null)
   const fileGalleryRef = useRef(null)
   const barcodeStreamRef = useRef(null)
@@ -197,7 +197,9 @@ export default function FoodScan({ onBack, onMealAdded }) {
         <button onClick={() => { stopCamera(); onBack() }} style={{ color: 'white', fontSize: 22, background: 'none', border: 'none', cursor: 'pointer' }}>←</button>
         <div>
           <div style={{ color: 'white', fontWeight: 900, fontSize: 18 }}>Сканер еды</div>
-          <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12 }}>Фото или штрихкод</div>
+          <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12 }}>
+            Добавляем в {({ breakfast: 'завтрак', lunch: 'обед', dinner: 'ужин', snack: 'перекус' })[mealType]}
+          </div>
         </div>
       </div>
 
@@ -208,8 +210,11 @@ export default function FoodScan({ onBack, onMealAdded }) {
         {/* Main menu */}
         {!mode && !processing && (
           <>
-
-
+            {initialMode && (
+              <div style={{ background: 'var(--pink-light)', color: 'var(--pink)', borderRadius: 10, padding: '9px 12px', fontSize: 12, fontWeight: 700 }}>
+                Выбрано: {initialMode === 'photo' ? 'фото блюда' : 'штрихкод'}. При необходимости можно использовать другой способ ниже.
+              </div>
+            )}
             <div style={{ background: 'var(--white)', borderRadius: 'var(--radius)', padding: 20, border: '2px dashed var(--pink-mid)' }}>
               <div style={{ fontSize: 40, marginBottom: 8, textAlign: 'center' }}>📸</div>
               <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 4, textAlign: 'center' }}>Сфотографировать блюдо</div>
