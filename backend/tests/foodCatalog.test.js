@@ -35,7 +35,12 @@ test('external requests are cached and failures are retriable', async () => {
 test('barcode lookup never invents codes and exposes incomplete nutrition', async () => {
   const urls=[]
   const c=createRemoteCatalog(async url => { urls.push(url); return {ok:true,json:async()=>({product:{product_name_ru:'Тест',nutriments:{}}})} })
-  assert.equal((await c.barcode('012345678905')).reason,'nutrition_missing')
+  const product = await c.barcode('012345678905')
+  assert.equal(product.found,true)
+  assert.equal(product.name,'Тест')
+  assert.equal(product.calories,null)
+  assert.equal(product.protein,null)
+  assert.equal(product.nutrition_complete,false)
   assert.equal(urls.length,1)
   assert.ok(urls[0].endsWith('/012345678905.json'))
 })

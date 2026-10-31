@@ -69,9 +69,10 @@ export default function Home({ user, onOpenAI, onTabChange }) {
     const version = ++searchVersion.current
     setFoodSearchError('')
     setSearching(false)
+    if (selectedFood) { setSearchResults([]); return }
     const local = searchLocalFoods(query)
     setSearchResults(local)
-    if (!query.trim() || selectedFood) return
+    if (!query.trim()) return
     const timer = setTimeout(async () => {
       try {
         const res = await searchFoods(query)
@@ -83,7 +84,7 @@ export default function Home({ user, onOpenAI, onTabChange }) {
 
   function mergeFoods(...groups) {
     const seen = new Set()
-    return groups.flat().filter(f => {
+    return groups.flat().filter(f => f && typeof f.name === 'string').filter(f => {
       const key = `${f.name} ${f.brand || ''}`.toLowerCase().replace(/ё/g, 'е').trim()
       if (seen.has(key)) return false
       seen.add(key); return true
@@ -219,8 +220,7 @@ export default function Home({ user, onOpenAI, onTabChange }) {
       initialMode={scanMode}
       onBack={() => { setShowScan(false); setScanMode(null) }}
       onMealAdded={(meal) => {
-        setMeals(m => [...m, meal])
-        setStats(s => ({ ...s, consumed: s.consumed + (meal.calories || 0) }))
+        loadData()
       }}
     />
   )

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useTelegram } from '../hooks/useTelegram'
 import { addMeal, searchCatalog, lookupProductCode } from '../utils/api'
 import { normalizeProductCode } from '../utils/productCode'
+import { nutrientNumber, parsePhotoNutrition } from '../utils/nutrition'
 
 export default function FoodScan({ onBack, onMealAdded }) {
   const { haptic } = useTelegram()
@@ -14,13 +15,13 @@ export default function FoodScan({ onBack, onMealAdded }) {
   const [weight, setWeight] = useState('100')
   const [manualBarcode, setManualBarcode] = useState('')
   const [editName, setEditName] = useState('')
-  const [editCal, setEditCal] = useState(0)
+  const [editCal, setEditCal] = useState('')
   const [barcodeImage, setBarcodeImage] = useState(null)
   const [barcodeCode, setBarcodeCode] = useState('')
   const [nameSearch, setNameSearch] = useState('')
   const [nameResults, setNameResults] = useState([])
   const [nameSearching, setNameSearching] = useState(false)
-  const [recalcTimeout, setRecalcTimeout] = useState(null)
+    const photoIntentRef = useRef('dish')
   const fileEnvRef = useRef(null)
   const fileGalleryRef = useRef(null)
   const barcodeStreamRef = useRef(null)
@@ -63,7 +64,7 @@ export default function FoodScan({ onBack, onMealAdded }) {
   const captureBarcode = async () => {
     haptic('medium')
     const v = document.getElementById('barcode-video')
-    if (!v) return
+    if (!v || !v.videoWidth || !v.videoHeight) { setError('Камера ещё не готова. Подожди и попробуй снова.'); return }
     const canvas = document.createElement('canvas')
     canvas.width = v.videoWidth || 1280
     canvas.height = v.videoHeight || 720
@@ -94,11 +95,12 @@ export default function FoodScan({ onBack, onMealAdded }) {
       const data = response.data
       if (data.found) {
         setResult({ source: 'barcode', ...data, unit_weight: 100 })
-        setEditName(data.name); setEditCal(data.calories)
+        setEditName(data.name); setEditCal(data.calories ?? '')
         setMode(null)
+        if (data.nutrition_complete === false) setError('В базе не заполнены все КБЖУ. Сфотографируй этикетку или введи значения на 100 г/мл вручную.')
       } else {
         setBarcodeCode(code); setMode('barcode_name_search')
-        if (data.reason === 'nutrition_missing') setError('Продукт найден, но КБЖУ не заполнены. Найди аналог по названию или используй фото этикетки.')
+        if (data.reason === 'nutrition_missing') setError('Продукт найден, но КБЖУ не заполнены. Используй фото этикетки.')
       }
     } catch(e) {
       setError(e.response?.data?.error || 'Не удалось связаться с каталогом. Повтори поиск.')
@@ -115,39 +117,46 @@ export default function FoodScan({ onBack, onMealAdded }) {
     try {
       const groqToken = import.meta.env.VITE_GROQ_TOKEN
       if (!groqToken) throw new Error('no_token')
-      const resized = await resizeImage(file, 512)
+      const resized = await resizeImage(file, 1024)
+      const intent = photoIntentRef.current
+      const model = import.meta.env.VITE_GROQ_VISION_MODEL || 'qwen/qwen3.8-27b'
       const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
+        signal: AbortSignal.timeout(30000),
         headers: { 'Authorization': `Bearer ${groqToken}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+          model,
+          ...(model.startsWith('qwen/') ? { reasoning_effort: 'none' } : {}),
+          response_format: { type: 'json_object' },
           messages: [{ role: 'user', content: [
-            { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${resized}`, detail: 'low' } },
-            { type: 'text', text: 'What food is in this image? Reply ONLY with JSON: {"name":"название на русском","calories":kcal_per_100g,"protein":g,"fat":g,"carbs":g}' }
+            { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${resized}` } },
+            { type: 'text', text: intent === 'label'
+              ? 'Read the nutrition label. Return JSON only: {"recognized":true,"name":"название продукта на русском","calories":number_or_null,"protein":number_or_null,"fat":number_or_null,"carbs":number_or_null,"unit":"100g or 100ml"}. Copy values per 100g/100ml exactly, convert kJ to kcal only if necessary. If unreadable use null; do not estimate or invent missing values. If there is no food label return {"recognized":false}.'
+              : 'Identify the food. Return JSON only: {"recognized":true,"name":"название на русском","calories":kcal_per_100g,"protein":grams_per_100g,"fat":grams_per_100g,"carbs":grams_per_100g,"unit":"100g"}. Values are estimates per 100g, not the whole plate. If not food return {"recognized":false}.' }
           ]}],
-          max_tokens: 100, temperature: 0
+          max_completion_tokens: 2048, temperature: 0
         })
       })
-      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      if (!response.ok) {
+        await response.json().catch(() => ({}))
+        if (response.status === 404) throw new Error('vision_unavailable')
+        if (response.status === 401 || response.status === 403) throw new Error('vision_access')
+        if (response.status === 429) throw new Error('vision_busy')
+        throw new Error('vision_error')
+      }
       const data = await response.json()
       const text = data.choices?.[0]?.message?.content?.trim() || ''
-      const jsonMatch = text.match(/\{[^{}]+\}/)
-      if (!jsonMatch) throw new Error('no_json')
-      const parsed = JSON.parse(jsonMatch[0])
-      if (!Number.isFinite(Number(parsed.calories)) || Number(parsed.calories) < 0) throw new Error('no_json')
-      const res = {
-        source: 'photo', name: parsed.name || 'Блюдо',
-        calories: Math.round(parsed.calories),
-        protein: Math.round((parsed.protein || 0) * 10) / 10,
-        fat: Math.round((parsed.fat || 0) * 10) / 10,
-        carbs: Math.round((parsed.carbs || 0) * 10) / 10,
-        unit_weight: 100, imageFile
-      }
-      setResult(res); setEditName(res.name); setEditCal(res.calories)
+      const nutrition = parsePhotoNutrition(text)
+      const res = { ...nutrition, source: intent === 'label' ? 'photo_label' : 'photo', imageFile }
+      setResult(res); setEditName(res.name); setEditCal(res.calories ?? '')
     } catch(e) {
       if (e.message === 'no_token') setError('Токен Groq не настроен.')
       else if (e.message === 'no_json') setError('Не удалось распознать блюдо.')
-      else setError('Ошибка: ' + e.message)
+      else if (e.message === 'not_food') setError('На фото не удалось найти блюдо или пищевую этикетку.')
+      else if (e.message === 'vision_unavailable') setError('Модель распознавания временно недоступна. Можно ввести КБЖУ вручную.')
+      else if (e.message === 'vision_access') setError('Нет доступа к распознаванию фото. Можно ввести КБЖУ вручную.')
+      else if (e.message === 'vision_busy') setError('Сервис фото перегружен. Попробуй позже или введи КБЖУ вручную.')
+      else setError('Не удалось обработать фото. Повтори попытку или введи КБЖУ вручную.')
     } finally { setProcessing(false) }
   }
 
@@ -183,31 +192,33 @@ export default function FoodScan({ onBack, onMealAdded }) {
 
   const selectNameResult = (item) => {
     setResult({ source: 'barcode', barcode: barcodeCode, ...item, unit_weight: 100 })
-    setEditName(item.name); setEditCal(item.calories)
+    setEditName(item.name); setEditCal(item.calories ?? '')
     setMode(null)
   }
 
   const handleAddMeal = async () => {
     if (!result) return
-    if (result.nutrition_complete === false) { setError('В каталоге не все БЖУ заполнены. Используй фото этикетки или другой продукт.'); return }
+    const nutrients = { calories: nutrientNumber(editCal), protein: nutrientNumber(result.protein, 100), fat: nutrientNumber(result.fat, 100), carbs: nutrientNumber(result.carbs, 100) }
+    if (Object.values(nutrients).some(v => v === null)) { setError('Заполни все КБЖУ на 100 г/мл с этикетки. Пустое поле означает, что значение неизвестно.'); return }
     if (!Number.isFinite(Number(weight)) || Number(weight) <= 0) { setError('Укажи вес больше нуля.'); return }
     haptic('medium')
-    const w = parseFloat(weight) || 100
+    if (nutrients.protein + nutrients.fat + nutrients.carbs > 105) { setError('Проверь БЖУ: нужны значения на 100 г/мл.'); return }
+    const w = Number(weight)
     const ratio = w / (result.unit_weight || 100)
     try {
-      await addMeal({
+      const saved = await addMeal({
         name: editName || result.name,
-        calories: Math.round((Number.isFinite(Number(editCal)) ? Number(editCal) : result.calories) * ratio),
-        protein: Math.round((result.protein ?? 0) * ratio * 10) / 10,
-        fat: Math.round((result.fat ?? 0) * ratio * 10) / 10,
-        carbs: Math.round((result.carbs ?? 0) * ratio * 10) / 10,
+        calories: Math.round(nutrients.calories * ratio),
+        protein: Math.round(nutrients.protein * ratio * 10) / 10,
+        fat: Math.round(nutrients.fat * ratio * 10) / 10,
+        carbs: Math.round(nutrients.carbs * ratio * 10) / 10,
         type: mealType, date: (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` })()
       })
-      onMealAdded?.(); haptic('medium'); onBack()
+      onMealAdded?.(saved.data); haptic('medium'); onBack()
     } catch(e) { setError('Ошибка при добавлении.') }
   }
 
-  const calcCal = () => result ? Math.round((Number.isFinite(Number(editCal)) ? Number(editCal) : result.calories) * (parseFloat(weight) || 100) / (result.unit_weight || 100)) : 0
+  const calcCal = () => nutrientNumber(editCal) === null ? '—' : Math.round(nutrientNumber(editCal) * (parseFloat(weight) || 0) / 100)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: 'var(--bg)' }}>
@@ -219,22 +230,23 @@ export default function FoodScan({ onBack, onMealAdded }) {
         </div>
       </div>
 
+      <input ref={fileEnvRef} type="file" accept="image/*" capture="environment" onChange={handlePhotoSelect} style={{ display: 'none' }} />
+            <input ref={fileGalleryRef} type="file" accept="image/*" onChange={handlePhotoSelect} style={{ display: 'none' }} />
       <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14, flex: 1 }}>
 
         {/* Main menu */}
         {!mode && !processing && (
           <>
-            <input ref={fileEnvRef} type="file" accept="image/*" capture="environment" onChange={handlePhotoSelect} style={{ display: 'none' }} />
-            <input ref={fileGalleryRef} type="file" accept="image/*" onChange={handlePhotoSelect} style={{ display: 'none' }} />
+
 
             <div style={{ background: 'var(--white)', borderRadius: 'var(--radius)', padding: 20, border: '2px dashed var(--pink-mid)' }}>
               <div style={{ fontSize: 40, marginBottom: 8, textAlign: 'center' }}>📸</div>
               <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 4, textAlign: 'center' }}>Сфотографировать блюдо</div>
               <div style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center', marginBottom: 14 }}>Оценка КБЖУ на 100 г — подтверди состав и вес</div>
               <div style={{ display: 'flex', gap: 10 }}>
-                <button onClick={() => fileEnvRef.current?.click()}
+                <button onClick={() => { photoIntentRef.current = 'dish'; fileEnvRef.current?.click() }}
                   style={{ flex: 1, padding: 10, borderRadius: 10, background: 'var(--pink)', color: 'white', border: 'none', fontFamily: 'Nunito, sans-serif', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>📷 Камера</button>
-                <button onClick={() => fileGalleryRef.current?.click()}
+                <button onClick={() => { photoIntentRef.current = 'dish'; fileGalleryRef.current?.click() }}
                   style={{ flex: 1, padding: 10, borderRadius: 10, background: 'var(--bg)', color: 'var(--text)', border: '1.5px solid var(--border)', fontFamily: 'Nunito, sans-serif', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>🖼 Галерея</button>
               </div>
             </div>
@@ -309,7 +321,7 @@ export default function FoodScan({ onBack, onMealAdded }) {
                 <div style={{ fontWeight: 700, fontSize: 14 }}>{item.name}</div>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
                   {item.brand && <span style={{ color: 'var(--pink)', marginRight: 6 }}>{item.brand}</span>}
-                  {item.calories} ккал · Б:{item.protein} · Ж:{item.fat} · У:{item.carbs}
+                  {item.calories ?? '—'} ккал · Б:{item.protein ?? '—'} · Ж:{item.fat ?? '—'} · У:{item.carbs ?? '—'}
                 </div>
               </div>
             ))}
@@ -383,17 +395,23 @@ export default function FoodScan({ onBack, onMealAdded }) {
                   <input value={editName} onChange={e => setEditName(e.target.value)}
                     style={{ fontSize: 15, fontWeight: 800, border: 'none', borderBottom: '1.5px solid var(--pink-mid)', background: 'transparent', width: '100%', padding: '2px 0', fontFamily: 'Nunito, sans-serif', marginBottom: 4 }} />
                   {result.brand && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{result.brand}</div>}
-                  {result.source === 'photo' && <div style={{ fontSize: 11, color: 'var(--green)', fontWeight: 700 }}>🤖 ИИ · можно исправить название</div>}
+                  {(result.source === 'photo' || result.source === 'photo_label') && <div style={{ fontSize: 11, color: 'var(--green)', fontWeight: 700 }}>{result.source === 'photo_label' ? 'Считано с этикетки — проверь значения' : 'Оценка по фото на 100 г — проверь состав и вес'}</div>}
                   {result.source === 'openfoodfacts' && <a href="https://world.openfoodfacts.org/" target="_blank" rel="noreferrer" style={{ fontSize: 11 }}>Open Food Facts · сверь с этикеткой</a>}
-                  {result.nutrition_complete === false && <div style={{ fontSize: 11 }}>БЖУ заполнены не полностью</div>}
+                  {[editCal, result.protein, result.fat, result.carbs].some(v => nutrientNumber(v) === null) && <div style={{ fontSize: 11 }}>КБЖУ заполнены не полностью</div>}
                   {result.barcode && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>📦 {result.barcode}</div>}
                 </div>
               </div>
 
+              <button className="btn-outline" onClick={() => { photoIntentRef.current = 'label'; fileEnvRef.current?.click() }} style={{ marginBottom: 12 }}>📷 Заполнить КБЖУ с этикетки</button>
+              <div style={{ fontSize: 11, marginBottom: 8 }}>Значения на 100 г/мл. Их можно исправить вручную.</div>
               <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-                {[['Калории', Number(editCal), 'ккал', 'var(--pink)'], ['Белки', result.protein, 'г', '#3498DB'], ['Жиры', result.fat, 'г', '#FF9800'], ['Углеводы', result.carbs, 'г', 'var(--green)']].map(([l, v, u, c]) => (
+                {[['Калории', editCal, 'ккал', 'var(--pink)'], ['Белки', result.protein, 'г', '#3498DB'], ['Жиры', result.fat, 'г', '#FF9800'], ['Углеводы', result.carbs, 'г', 'var(--green)']].map(([l, v, u, c]) => (
                   <div key={l} style={{ flex: 1, textAlign: 'center', background: 'var(--bg)', borderRadius: 8, padding: '8px 4px' }}>
-                    <div style={{ fontSize: 15, fontWeight: 900, color: c }}>{v ?? '—'}</div>
+                    <input aria-label={l + ' на 100 г/мл'} type="number" min="0" step="0.1" value={v ?? ''}
+                      onChange={e => {
+                        if (l === 'Калории') setEditCal(e.target.value)
+                        else { const key = { 'Белки': 'protein', 'Жиры': 'fat', 'Углеводы': 'carbs' }[l]; setResult(r => ({ ...r, [key]: e.target.value === '' ? null : e.target.value })) }
+                      }} style={{ width: '100%', padding: 3, fontSize: 15, textAlign: 'center', color: c }} />
                     <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 2 }}>{l}/{u}</div>
                   </div>
                 ))}
