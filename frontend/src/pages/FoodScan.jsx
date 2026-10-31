@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useTelegram } from '../hooks/useTelegram'
-import { addMeal, searchCatalog, lookupProductCode } from '../utils/api'
+import { addMeal, searchCatalog, lookupProductCode, recognizeFoodPhoto } from '../utils/api'
 import { normalizeProductCode } from '../utils/productCode'
 import { nutrientNumber, parsePhotoNutrition } from '../utils/nutrition'
 
@@ -73,10 +73,9 @@ export default function FoodScan({ onBack, onMealAdded }) {
     stopCamera(); setScanning(false); setProcessing(true)
 
     try {
-      const { BrowserMultiFormatReader } = await import('@zxing/browser')
-      const reader = new BrowserMultiFormatReader()
-      const decoded = await reader.decodeFromImageUrl(imgData)
-      const code = normalizeProductCode(decoded.getText())
+      const { decodeBarcodeCanvas } = await import('../utils/decodeBarcode')
+      const text = decodeBarcodeCanvas(canvas)
+      const code = normalizeProductCode(text)
       if (!code) throw new Error('unsupported_code')
       await lookupBarcode(code)
       return
@@ -115,48 +114,20 @@ export default function FoodScan({ onBack, onMealAdded }) {
     haptic('light')
     const imageFile = URL.createObjectURL(file)
     try {
-      const groqToken = import.meta.env.VITE_GROQ_TOKEN
-      if (!groqToken) throw new Error('no_token')
-      const resized = await resizeImage(file, 1024)
+      const resized = await resizeImage(file, 1280)
       const intent = photoIntentRef.current
-      const model = import.meta.env.VITE_GROQ_VISION_MODEL || 'qwen/qwen3.8-27b'
-      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        signal: AbortSignal.timeout(30000),
-        headers: { 'Authorization': `Bearer ${groqToken}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model,
-          ...(model.startsWith('qwen/') ? { reasoning_effort: 'none' } : {}),
-          response_format: { type: 'json_object' },
-          messages: [{ role: 'user', content: [
-            { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${resized}` } },
-            { type: 'text', text: intent === 'label'
-              ? 'Read the nutrition label. Return JSON only: {"recognized":true,"name":"название продукта на русском","calories":number_or_null,"protein":number_or_null,"fat":number_or_null,"carbs":number_or_null,"unit":"100g or 100ml"}. Copy values per 100g/100ml exactly, convert kJ to kcal only if necessary. If unreadable use null; do not estimate or invent missing values. If there is no food label return {"recognized":false}.'
-              : 'Identify the food. Return JSON only: {"recognized":true,"name":"название на русском","calories":kcal_per_100g,"protein":grams_per_100g,"fat":grams_per_100g,"carbs":grams_per_100g,"unit":"100g"}. Values are estimates per 100g, not the whole plate. If not food return {"recognized":false}.' }
-          ]}],
-          max_completion_tokens: 2048, temperature: 0
-        })
-      })
-      if (!response.ok) {
-        await response.json().catch(() => ({}))
-        if (response.status === 404) throw new Error('vision_unavailable')
-        if (response.status === 401 || response.status === 403) throw new Error('vision_access')
-        if (response.status === 429) throw new Error('vision_busy')
-        throw new Error('vision_error')
-      }
-      const data = await response.json()
-      const text = data.choices?.[0]?.message?.content?.trim() || ''
+      const response = await recognizeFoodPhoto(`data:image/jpeg;base64,${resized}`, intent)
+      const text = response.data?.content || ''
       const nutrition = parsePhotoNutrition(text)
       const res = { ...nutrition, source: intent === 'label' ? 'photo_label' : 'photo', imageFile }
       setResult(res); setEditName(res.name); setEditCal(res.calories ?? '')
     } catch(e) {
-      if (e.message === 'no_token') setError('Токен Groq не настроен.')
-      else if (e.message === 'no_json') setError('Не удалось распознать блюдо.')
+      if (e.response?.data?.message) setError(`${e.response.data.message} (${e.response.data.error || 'PHOTO_SERVER'})`)
+      else if (e.code === 'ECONNABORTED') setError('Сервер не ответил вовремя. Попробуй ещё раз. (PHOTO_NETWORK_TIMEOUT)')
+      else if (e.message === 'bad_image') setError('Не удалось открыть фото на устройстве. Выбери JPEG или PNG. (PHOTO_DECODE)')
       else if (e.message === 'not_food') setError('На фото не удалось найти блюдо или пищевую этикетку.')
-      else if (e.message === 'vision_unavailable') setError('Модель распознавания временно недоступна. Можно ввести КБЖУ вручную.')
-      else if (e.message === 'vision_access') setError('Нет доступа к распознаванию фото. Можно ввести КБЖУ вручную.')
-      else if (e.message === 'vision_busy') setError('Сервис фото перегружен. Попробуй позже или введи КБЖУ вручную.')
-      else setError('Не удалось обработать фото. Повтори попытку или введи КБЖУ вручную.')
+      else if (e.message === 'no_json' || e instanceof SyntaxError) setError('Сервис не вернул данные о еде. Попробуй другое фото. (PHOTO_PARSE)')
+      else setError('Не удалось отправить фото. Проверь соединение и повтори попытку. (PHOTO_NETWORK)')
     } finally { setProcessing(false) }
   }
 
@@ -173,7 +144,7 @@ export default function FoodScan({ onBack, onMealAdded }) {
         canvas.getContext('2d').drawImage(img, 0, 0, w, h)
         resolve(canvas.toDataURL('image/jpeg', 0.8).split(',')[1])
       }
-      img.onerror = reject; img.src = url
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('bad_image')) }; img.src = url
     })
   }
 
@@ -380,6 +351,10 @@ export default function FoodScan({ onBack, onMealAdded }) {
               <div style={{ fontSize: 13, color: '#DC2626', fontWeight: 600 }}>⚠️ {error}</div>
             </div>
             <button className="btn-primary" onClick={reset}>Попробовать снова</button>
+            {!result && <button className="btn-outline" style={{ marginTop: 10 }} onClick={() => {
+              setError(null); setMode(null); setEditName('Моё блюдо'); setEditCal('')
+              setResult({ name: 'Моё блюдо', calories: null, protein: null, fat: null, carbs: null, source: 'manual', unit_weight: 100 })
+            }}>Ввести КБЖУ вручную</button>}
           </div>
         )}
 

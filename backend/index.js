@@ -9,6 +9,7 @@ app.use(cors({
   origin: '*',
   credentials: true
 }))
+app.use('/api/food-photo', express.json({ limit: '3mb' }), require('./routes/foodPhoto'))
 app.use(express.json())
 
 require('./db/init')
