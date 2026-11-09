@@ -2,10 +2,10 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "schedules": {
     "keep-sofe-notifications-running": {
-      "schedule": "*/10 * * * *",
+      "schedule": "*/20 * * * *",
       "function": "api/wake",
       "timezone": "UTC",
-      "jitter": 1
+      "jitter": 15
     }
   },
   "functions": {

@@ -35,6 +35,19 @@ app.get('/health', (req, res) => res.json({ ok: true, version: '1.0.0' }))
 app.get('/api/health', (req, res) => res.json({ ok: true, version: '1.0.0' }))
 
 // Start bot with notifications
-require('./bot')
+const { runDueNotifications } = require('./bot')
+
+app.post('/api/internal/notifications/run', async (req, res) => {
+  const expected = process.env.NOTIFICATION_SECRET
+  const provided = req.headers['x-notification-secret']
+  if (!expected || provided !== expected) return res.status(401).json({ error: 'Unauthorized' })
+
+  try {
+    res.json(await runDueNotifications())
+  } catch (error) {
+    console.error('Notification run failed:', error.message)
+    res.status(500).json({ error: 'Notification run failed' })
+  }
+})
 
 app.listen(PORT, () => console.log(`🚀 SOFE Backend running on port ${PORT}`))
