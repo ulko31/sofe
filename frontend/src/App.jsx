@@ -24,19 +24,45 @@ export default function App() {
   const [appUser, setAppUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [needsOnboarding, setNeedsOnboarding] = useState(false)
+  const [loadError, setLoadError] = useState('')
+  const [loadAttempt, setLoadAttempt] = useState(0)
   const [pendingFriendToken, setPendingFriendToken] = useState(null)
 
   // Load user
   useEffect(() => {
     if (!user) return
-    getMe()
-      .then(r => {
-        setAppUser(r.data.user)
-        setNeedsOnboarding(!r.data.user.onboarded)
+    let cancelled = false
+
+    const loadUser = async () => {
+      setLoading(true)
+      setLoadError('')
+      const delays = [0, 1500, 3500]
+
+      for (const delay of delays) {
+        if (delay) await new Promise(resolve => setTimeout(resolve, delay))
+        try {
+          const response = await getMe()
+          if (cancelled) return
+          setAppUser(response.data.user)
+          setNeedsOnboarding(!response.data.user.onboarded)
+          setLoading(false)
+          return
+        } catch (error) {
+          const status = error.response?.status
+          const retryable = !status || status === 429 || status >= 500
+          if (!retryable) break
+        }
+      }
+
+      if (!cancelled) {
+        setLoadError('Не удалось загрузить профиль. Проверь интернет и попробуй ещё раз.')
         setLoading(false)
-      })
-      .catch(() => { setNeedsOnboarding(true); setLoading(false) })
-  }, [user])
+      }
+    }
+
+    loadUser()
+    return () => { cancelled = true }
+  }, [user, loadAttempt])
 
   useEffect(() => {
     if (!window.Telegram?.WebApp?.initData) setLoading(false)
@@ -88,6 +114,17 @@ export default function App() {
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
       <div className="spinner" />
       <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>Загружаем SOFE...</p>
+    </div>
+  )
+
+  if (loadError) return (
+    <div style={{ minHeight: '100vh', padding: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', gap: 14 }}>
+      <div style={{ fontSize: 42 }}>📡</div>
+      <h2 style={{ fontSize: 22 }}>Профиль временно не загрузился</h2>
+      <p style={{ color: 'var(--text-muted)', maxWidth: 360 }}>{loadError}</p>
+      <button className="btn-primary" style={{ maxWidth: 360 }} onClick={() => setLoadAttempt(value => value + 1)}>
+        Попробовать снова
+      </button>
     </div>
   )
 

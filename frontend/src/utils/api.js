@@ -4,7 +4,8 @@ const BASE_URL = import.meta.env.VITE_API_URL || '/api'
 
 const api = axios.create({
   baseURL: BASE_URL,
-  timeout: 15000
+  // Render's free instance can need time to wake after a period of inactivity.
+  timeout: 45000
 })
 
 api.interceptors.request.use(config => {
@@ -36,7 +37,7 @@ api.interceptors.response.use(
 
 export default api
 
-export const getMe = () => api.get('/user/me')
+export const getMe = () => api.get('/user/me', { timeout: 60000 })
 export const updateProfile = (data) => api.put('/user/profile', data)
 
 export const getTodayStats = () => {

@@ -29,7 +29,7 @@ router.get('/me', auth, async (req, res) => {
 
 // PUT /api/user/profile
 router.put('/profile', auth, async (req, res) => {
-  const { name, calories, goal, activity, onboarded, telegram_id, age, weight, height, gender, notifications_enabled } = req.body
+  const { name, calories, goal, activity, onboarded, age, weight, height, gender } = req.body
   try {
     await r(`UPDATE users SET
       name = COALESCE(?, name),
@@ -44,9 +44,7 @@ router.put('/profile', auth, async (req, res) => {
       WHERE id = ?`,
       [name || null, calories || null, goal || null, activity || null,
        onboarded != null ? (onboarded ? 1 : 0) : null,
-      notifications_enabled != null ? 1 : null,
-      onboarded ? 1 : null, onboarded ? 1 : null, onboarded ? 1 : null,
-      age || null, weight || null, height || null,
+       age || null, weight || null, height || null,
        gender || null, req.user.id])
     const updated = await qOne('SELECT * FROM users WHERE id = ?', [req.user.id])
     res.json({ user: updated })

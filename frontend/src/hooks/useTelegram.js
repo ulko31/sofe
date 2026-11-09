@@ -8,8 +8,8 @@ export function useTelegram() {
     if (!tg) return
     tg.ready()
     tg.expand()
-    tg.setHeaderColor('#E8437A')
-    tg.setBackgroundColor('#F7F5F0')
+    tg.setHeaderColor('#B5003D')
+    tg.setBackgroundColor('#F6F0E7')
 
     const u = tg.initDataUnsafe?.user
     if (u) {

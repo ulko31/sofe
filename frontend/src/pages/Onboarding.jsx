@@ -62,6 +62,7 @@ export default function Onboarding({ onComplete, tgUser }) {
     goal: '', activity: '', calories: '2000'
   })
   const [loading, setLoading] = useState(false)
+  const [saveError, setSaveError] = useState('')
 
   const current = steps[step]
 
@@ -83,6 +84,7 @@ export default function Onboarding({ onComplete, tgUser }) {
       setStep(s => s + 1)
     } else {
       setLoading(true)
+      setSaveError('')
       try {
         const res = await api.put('/user/profile', {
           ...data,
@@ -96,7 +98,7 @@ export default function Onboarding({ onComplete, tgUser }) {
         onComplete(res.data.user)
       } catch (e) {
         console.error(e)
-        onComplete({ ...data, calories: parseInt(data.calories) || 2000, onboarded: true })
+        setSaveError('Не удалось сохранить профиль. Данные не потеряны — попробуй ещё раз.')
       } finally {
         setLoading(false)
       }
@@ -224,6 +226,11 @@ export default function Onboarding({ onComplete, tgUser }) {
       </div>
 
       <div style={{ padding: '24px 24px max(24px, env(safe-area-inset-bottom))' }}>
+        {saveError && (
+          <div style={{ marginBottom: 12, padding: '10px 12px', borderRadius: 'var(--radius-sm)', background: 'var(--pink-light)', color: 'var(--pink-dark)', fontSize: 13, fontWeight: 700 }}>
+            {saveError}
+          </div>
+        )}
         <button
           className="btn-primary"
           onClick={next}
