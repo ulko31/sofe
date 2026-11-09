@@ -4,7 +4,8 @@
     "keep-sofe-notifications-running": {
       "schedule": "*/10 * * * *",
       "function": "api/wake",
-      "timezone": "UTC"
+      "timezone": "UTC",
+      "jitter": 1
     }
   },
   "functions": {
