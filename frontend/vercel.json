@@ -1,9 +1,18 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "crons": [
-    {
-      "path": "/api/wake",
-      "schedule": "*/10 * * * *"
+  "schedules": {
+    "keep-sofe-notifications-running": {
+      "schedule": "*/10 * * * *",
+      "function": "api/wake",
+      "timezone": "UTC"
     }
-  ]
+  },
+  "functions": {
+    "api/wake.js": {
+      "maxDuration": 60,
+      "experimentalTriggers": [
+        { "type": "schedule/v1beta" }
+      ]
+    }
+  }
 }
