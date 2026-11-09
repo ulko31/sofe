@@ -27,8 +27,8 @@ async function getUser(telegramId) {
   return queryOne('SELECT * FROM users WHERE telegram_id = ?', [String(telegramId)])
 }
 
-async function getTodayStats(userId) {
-  const today = new Date().toISOString().split('T')[0]
+async function getTodayStats(userId, dateOverride = null) {
+  const today = dateOverride || new Date().toISOString().split('T')[0]
   const meals = await query('SELECT * FROM meals WHERE user_id = ? AND date = ?', [userId, today])
   const trackers = await queryOne('SELECT * FROM trackers WHERE user_id = ? AND date = ?', [userId, today]) || {}
   return { consumed: meals.reduce((s, m) => s + (m.calories || 0), 0), meals, trackers }
@@ -79,12 +79,20 @@ async function send(chatId, text, inlineKeyboard = null) {
     const opts = { parse_mode: 'Markdown' }
     if (inlineKeyboard) opts.reply_markup = { inline_keyboard: inlineKeyboard }
     await bot.sendMessage(chatId, text, opts)
+    return true
   } catch(e) {
     if (e.message?.includes('parse')) {
       // Retry without markdown
-      try { await bot.sendMessage(chatId, text.replace(/[*_`]/g, ''), { reply_markup: inlineKeyboard ? { inline_keyboard: inlineKeyboard } : undefined }) }
-      catch(e2) {}
+      try {
+        await bot.sendMessage(chatId, text.replace(/[*_`]/g, ''), { reply_markup: inlineKeyboard ? { inline_keyboard: inlineKeyboard } : undefined })
+        return true
+      } catch(e2) {
+        console.error(`Telegram send failed for ${chatId}:`, e2.message)
+      }
+    } else {
+      console.error(`Telegram send failed for ${chatId}:`, e.message)
     }
+    return false
   }
 }
 
@@ -288,6 +296,95 @@ async function getAllUsers() {
   return query("SELECT * FROM users WHERE onboarded = 1 AND notifications_enabled != 0")
 }
 
+function getMoscowTime(now = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Moscow', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+  }).formatToParts(now).reduce((result, part) => {
+    result[part.type] = part.value
+    return result
+  }, {})
+
+  return {
+    date: `${parts.year}-${parts.month}-${parts.day}`,
+    minutes: Number(parts.hour) * 60 + Number(parts.minute)
+  }
+}
+
+async function reserveNotification(userId, key, date) {
+  const result = await run(
+    'INSERT OR IGNORE INTO notification_runs (user_id, notification_key, date) VALUES (?, ?, ?)',
+    [userId, key, date]
+  )
+  return result.changes > 0
+}
+
+async function releaseNotification(userId, key, date) {
+  await run('DELETE FROM notification_runs WHERE user_id = ? AND notification_key = ? AND date = ?', [userId, key, date])
+}
+
+async function runDueNotifications(now = new Date()) {
+  await exec(`CREATE TABLE IF NOT EXISTS notification_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    notification_key TEXT NOT NULL,
+    date TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(user_id, notification_key, date)
+  )`)
+
+  const { date, minutes } = getMoscowTime(now)
+  const users = await getAllUsers()
+  const due = target => minutes >= target && minutes < target + 50
+  let sent = 0
+
+  for (const user of users) {
+    const name = user.name?.split(' ')[0] || 'красотка'
+    const jobs = []
+
+    if (user.notify_morning && due(8 * 60)) {
+      const tips = ['💧 Начни день со стакана воды!', '🧘 5 минут растяжки с утра!', '🥗 Хороший завтрак — залог дня!', '☀️ 10 минут на свежем воздухе!']
+      jobs.push({
+        key: 'morning',
+        text: `🌸 *Доброе утро, ${name}!*\n\nТвоя цель: *${user.calories || 2000} ккал*\n\n${tips[Math.floor(Math.random() * tips.length)]}`
+      })
+    }
+
+    if (user.notify_meals && due(12 * 60)) {
+      const { consumed } = await getTodayStats(user.id, date)
+      const remaining = Math.max(0, (user.calories || 2000) - consumed)
+      jobs.push({ key: 'lunch', text: `☀️ *Время обеда, ${name}!*\n\nСъедено: *${consumed} ккал* · Осталось: *${remaining} ккал*` })
+    }
+
+    for (const [key, target] of [['water_14', 14 * 60], ['water_17', 17 * 60]]) {
+      if (!user.notify_water || !due(target)) continue
+      const { trackers } = await getTodayStats(user.id, date)
+      if ((trackers.water || 0) < 1.5) jobs.push({ key, text: '💧 Привет! Выпей стакан воды прямо сейчас 🌊' })
+    }
+
+    if (user.notify_meals && due(19 * 60)) {
+      const { consumed, trackers } = await getTodayStats(user.id, date)
+      const goal = user.calories || 2000
+      const remaining = Math.max(0, goal - consumed)
+      const status = consumed === 0 ? '📝 Не забудь зафиксировать приёмы пищи!' : remaining > 0 ? `Осталось *${remaining} ккал*` : '🎯 Норма выполнена!'
+      jobs.push({
+        key: 'evening',
+        text: `🌙 *Вечерний отчёт, ${name}!*\n\n🔥 Калории: *${consumed}* / ${goal}\n💧 Вода: *${Number(trackers.water || 0).toFixed(1)} л*\n\n${status}`
+      })
+    }
+
+    for (const job of jobs) {
+      if (!await reserveNotification(user.id, job.key, date)) continue
+      const delivered = await send(user.telegram_id, job.text, openAppBtn())
+      if (delivered) sent += 1
+      else await releaseNotification(user.id, job.key, date)
+      await new Promise(resolve => setTimeout(resolve, 100))
+    }
+  }
+
+  return { ok: true, date, checkedUsers: users.length, sent }
+}
+
 // Очередь уведомлений (приглашения и т.д.)
 cron.schedule('*/5 * * * *', async () => {
   try {
@@ -310,65 +407,11 @@ cron.schedule('*/5 * * * *', async () => {
   } catch(e) {}
 })
 
-// Утро 8:00
-cron.schedule('0 8 * * *', async () => {
-  const users = await getAllUsers()
-  const tips = ['💧 Начни день со стакана воды!', '🧘 5 минут растяжки с утра!', '🥗 Хороший завтрак — залог дня!', '☀️ 10 минут на свежем воздухе!']
-  for (const user of users) {
-    if (!user.notify_morning) continue
-    const name = user.name?.split(' ')[0] || 'красотка'
-    await send(user.telegram_id,
-      `🌸 *Доброе утро, ${name}!*\n\nТвоя цель: *${user.calories || 2000} ккал*\n\n${tips[Math.floor(Math.random() * tips.length)]}`,
-      openAppBtn())
-    await new Promise(r => setTimeout(r, 100))
-  }
-}, { timezone: 'Europe/Moscow' })
-
-// Обед 12:00
-cron.schedule('0 12 * * *', async () => {
-  const users = await getAllUsers()
-  for (const user of users) {
-    if (!user.notify_meals) continue
-    const { consumed } = await getTodayStats(user.id)
-    const remaining = Math.max(0, (user.calories || 2000) - consumed)
-    const name = user.name?.split(' ')[0] || 'красотка'
-    await send(user.telegram_id,
-      `☀️ *Время обеда, ${name}!*\n\nСъедено: *${consumed} ккал* · Осталось: *${remaining} ккал*`,
-      openAppBtn())
-    await new Promise(r => setTimeout(r, 100))
-  }
-}, { timezone: 'Europe/Moscow' })
-
-// Вода 14:00 и 17:00
-const waterRemind = async () => {
-  const users = await getAllUsers()
-  for (const user of users) {
-    if (!user.notify_water) continue
-    const { trackers } = await getTodayStats(user.id)
-    if ((trackers.water || 0) < 1.5) {
-      await send(user.telegram_id, `💧 Привет! Выпей стакан воды прямо сейчас 🌊`, openAppBtn())
-      await new Promise(r => setTimeout(r, 100))
-    }
-  }
-}
-cron.schedule('0 14 * * *', waterRemind, { timezone: 'Europe/Moscow' })
-cron.schedule('0 17 * * *', waterRemind, { timezone: 'Europe/Moscow' })
-
-// Вечер 19:00
-cron.schedule('0 19 * * *', async () => {
-  const users = await getAllUsers()
-  for (const user of users) {
-    const { consumed, trackers } = await getTodayStats(user.id)
-    const goal = user.calories || 2000
-    const remaining = Math.max(0, goal - consumed)
-    const name = user.name?.split(' ')[0] || 'красотка'
-    const status = consumed === 0 ? '📝 Не забудь зафиксировать приёмы пищи!' : remaining > 0 ? `Осталось *${remaining} ккал*` : '🎯 Норма выполнена!'
-    await send(user.telegram_id,
-      `🌙 *Вечерний отчёт, ${name}!*\n\n🔥 Калории: *${consumed}* / ${goal}\n💧 Вода: *${Number(trackers.water||0).toFixed(1)} л*\n\n${status}`,
-      openAppBtn())
-    await new Promise(r => setTimeout(r, 100))
-  }
-}, { timezone: 'Europe/Moscow' })
+// Run while the service is awake. Vercel Schedules calls the same idempotent
+// function, so free-instance sleep cannot skip an entire notification window.
+cron.schedule('*/5 * * * *', () => runDueNotifications().catch(error => {
+  console.error('Scheduled notification error:', error.message)
+}))
 
 // Напоминание о мероприятиях за 2 часа
 cron.schedule('*/30 * * * *', async () => {
@@ -400,3 +443,5 @@ bot.on('polling_error', err => {
 
 console.log('🤖 SOFE Bot started')
 console.log('🔑 GROQ_TOKEN:', GROQ_TOKEN ? 'SET (' + GROQ_TOKEN.substring(0, 8) + '...)' : 'NOT SET')
+
+module.exports = { runDueNotifications }
