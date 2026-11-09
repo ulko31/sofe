@@ -204,7 +204,7 @@ export default function Home({ user, onOpenAI, onTabChange }) {
   const progress = Math.min(100, ((stats.consumed || 0) / (stats.goal || 2000)) * 100)
 
   const mealTypeLabel = { breakfast: 'Завтрак', lunch: 'Обед', dinner: 'Ужин', snack: 'Перекус' }
-  const mealTypeColor = { breakfast: '#FFB347', lunch: '#4CAF50', dinner: '#E8437A', snack: '#9B59B6' }
+  const mealTypeColor = { breakfast: '#FFB347', lunch: '#B7CB25', dinner: '#B5003D', snack: '#9B59B6' }
 
   const grouped = meals.reduce((acc, m) => {
     const t = m.type || 'snack'
@@ -258,7 +258,7 @@ export default function Home({ user, onOpenAI, onTabChange }) {
       </div>
 
       {/* Calories card */}
-      <div style={{ background: 'var(--pink)', borderRadius: 'var(--radius)', padding: 18, color: 'white', position: 'relative', overflow: 'hidden' }}>
+      <div style={{ background: 'linear-gradient(135deg, #BD0041 0%, #82002C 100%)', borderRadius: 'var(--radius)', padding: 18, color: 'white', position: 'relative', overflow: 'hidden', boxShadow: '0 14px 34px rgba(130,0,44,0.23)' }}>
         <div style={{ position: 'absolute', right: -20, top: -20, width: 100, height: 100, borderRadius: '50%', background: 'rgba(255,255,255,0.1)' }} />
         <div style={{ position: 'absolute', right: 20, bottom: -30, width: 80, height: 80, borderRadius: '50%', background: 'rgba(255,255,255,0.08)' }} />
         <div style={{ display: 'flex', justifyContent: 'space-between', position: 'relative', zIndex: 1 }}>
@@ -274,7 +274,7 @@ export default function Home({ user, onOpenAI, onTabChange }) {
           </div>
         </div>
         <div style={{ height: 6, background: 'rgba(255,255,255,0.3)', borderRadius: 3, margin: '12px 0 10px', position: 'relative', zIndex: 1 }}>
-          <div style={{ height: '100%', background: 'white', borderRadius: 3, width: `${progress}%`, transition: 'width 0.5s' }} />
+          <div style={{ height: '100%', background: '#D4E83A', borderRadius: 3, width: `${progress}%`, transition: 'width 0.5s' }} />
         </div>
         <div style={{ display: 'flex', gap: 16, position: 'relative', zIndex: 1 }}>
           {[['Сожжено', stats.burned || 0, 'ккал'], ['Белки', Math.round(stats.protein || 0), 'г'], ['Жиры', Math.round(stats.fat || 0), 'г'], ['Углеводы', Math.round(stats.carbs || 0), 'г']].map(([l, v, u]) => (
@@ -289,15 +289,15 @@ export default function Home({ user, onOpenAI, onTabChange }) {
       {/* Trackers */}
       <div>
         {/* AI Assistant quick access */}
-        <div onClick={() => onOpenAI?.()} style={{ background: '#EAF3DE', borderRadius: 'var(--radius)', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', marginBottom: 4 }}>
+        <div onClick={() => onOpenAI?.()} style={{ background: 'var(--green-light)', borderRadius: 'var(--radius)', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', marginBottom: 4 }}>
           <div style={{ width: 44, height: 44, flexShrink: 0, background: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <img src="/mascot.svg" alt="SOFE" style={{ width: '85%', height: '85%', objectFit: 'contain' }} />
             </div>
           <div style={{ flex: 1 }}>
-            <div style={{ color: '#3a6b1a', fontWeight: 800, fontSize: 14 }}>SOFE ИИ-ассистент</div>
-            <div style={{ color: '#5a8a2a', fontSize: 12, marginTop: 2 }}>Спроси про питание или тренировки</div>
+            <div style={{ color: 'var(--green-dark)', fontWeight: 800, fontSize: 14 }}>SOFE ИИ-ассистент</div>
+            <div style={{ color: 'var(--green-dark)', fontSize: 12, marginTop: 2, opacity: 0.82 }}>Спроси про питание или тренировки</div>
           </div>
-          <i className="ti ti-chevron-right" style={{ color: '#5a8a2a', fontSize: 18 }} />
+          <i className="ti ti-chevron-right" style={{ color: 'var(--green-dark)', fontSize: 18 }} />
         </div>
 
         <div className="section-header"><h3>Трекеры</h3></div>
