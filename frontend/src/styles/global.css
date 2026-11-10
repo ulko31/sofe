@@ -1,17 +1,18 @@
 :root {
-  --pink: #B5003D;
-  --pink-light: #F8E1E9;
-  --pink-mid: #E48EA9;
-  --pink-dark: #780028;
-  --green: #C1D62F;
-  --green-light: #F3F6CC;
-  --green-mid: #DFE97E;
-  --green-dark: #687714;
-  --bg: #F6F0E7;
-  --white: #FFFCF6;
+  /* SOFE brand: deep berry + warm volt yellow + graphite */
+  --pink: #9C173C;
+  --pink-light: #F1E5E7;
+  --pink-mid: #C99BA7;
+  --pink-dark: #681029;
+  --green: #D8DB32;
+  --green-light: #F3F1C5;
+  --green-mid: #E5E077;
+  --green-dark: #5E5A10;
+  --bg: #F4EFE6;
+  --white: #FFFCF7;
   --text: #292526;
-  --text-muted: #77706F;
-  --border: #E6DDD6;
+  --text-muted: #756F6D;
+  --border: #E3DAD2;
   --radius: 14px;
   --radius-sm: 10px;
   --radius-xs: 6px;
@@ -58,7 +59,7 @@ button {
 button:active { transform: scale(0.97); }
 
 .btn-primary {
-  background: var(--pink);
+  background: var(--text);
   color: white;
   border-radius: 14px;
   padding: 14px 24px;
@@ -67,7 +68,7 @@ button:active { transform: scale(0.97); }
   width: 100%;
   transition: background 0.15s;
 }
-.btn-primary:hover { background: var(--pink-dark); }
+.btn-primary:hover { background: #161415; }
 
 .btn-outline {
   background: transparent;
