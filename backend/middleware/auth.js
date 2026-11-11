@@ -1,19 +1,14 @@
 const { queryOne, run } = require('../db/turso')
+const { validateInitData } = require('../utils/telegramAuth')
 
 module.exports = async function auth(req, res, next) {
   try {
     const initData = req.headers['x-telegram-init-data'] || ''
     if (!initData) return res.status(401).json({ error: 'No auth' })
 
-    const params = new URLSearchParams(initData)
-    const userStr = params.get('user')
-    if (!userStr) return res.status(401).json({ error: 'No user' })
-
-    let tgUser
-    try { tgUser = JSON.parse(decodeURIComponent(userStr)) }
-    catch(e) { try { tgUser = JSON.parse(userStr) } catch(e2) { return res.status(401).json({ error: 'Bad user data' }) } }
-
-    if (!tgUser?.id) return res.status(401).json({ error: 'No user id' })
+    if (!process.env.BOT_TOKEN) return res.status(503).json({ error: 'Auth not configured' })
+    const tgUser = validateInitData(initData, process.env.BOT_TOKEN)
+    if (!tgUser) return res.status(401).json({ error: 'Invalid or expired Telegram session' })
 
     let user = await queryOne('SELECT * FROM users WHERE telegram_id = ?', [String(tgUser.id)])
 
@@ -30,6 +25,6 @@ module.exports = async function auth(req, res, next) {
     next()
   } catch(e) {
     console.error('Auth error:', e.message)
-    res.status(500).json({ error: 'Server error: ' + e.message })
+    res.status(500).json({ error: 'Server error' })
   }
 }
