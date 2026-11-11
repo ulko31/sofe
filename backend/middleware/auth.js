@@ -19,7 +19,7 @@ module.exports = async function auth(req, res, next) {
 
     if (!user) {
       const result = await run(
-        'INSERT INTO users (telegram_id, name, username) VALUES (?, ?, ?)',
+        'INSERT INTO users (telegram_id, name, username, notifications_enabled, notify_water, notify_meals, notify_events, notify_morning) VALUES (?, ?, ?, 0, 0, 0, 0, 0)',
         [String(tgUser.id), tgUser.first_name || '', tgUser.username || '']
       )
       user = await queryOne('SELECT * FROM users WHERE id = ?', [result.lastInsertRowid])
