@@ -150,9 +150,9 @@ async function initTurso(client) {
       goal TEXT DEFAULT 'health', activity TEXT DEFAULT 'medium',
       age INTEGER, weight REAL, height REAL, gender TEXT DEFAULT 'female',
       onboarded INTEGER DEFAULT 0,
-      notifications_enabled INTEGER DEFAULT 1,
-      notify_water INTEGER DEFAULT 1, notify_meals INTEGER DEFAULT 1,
-      notify_events INTEGER DEFAULT 1, notify_morning INTEGER DEFAULT 1,
+      notifications_enabled INTEGER DEFAULT 0,
+      notify_water INTEGER DEFAULT 0, notify_meals INTEGER DEFAULT 0,
+      notify_events INTEGER DEFAULT 0, notify_morning INTEGER DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now')))`,
     `CREATE TABLE IF NOT EXISTS meals (
       id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
@@ -215,6 +215,28 @@ async function initTurso(client) {
   for (const sql of tables) {
     try { await client.execute(sql) } catch(e) {}
   }
+
+  // Existing accounts were created with reminders enabled by default.
+  // Reset them once so every personal reminder requires explicit opt-in.
+  await client.execute(`CREATE TABLE IF NOT EXISTS app_migrations (
+    name TEXT PRIMARY KEY,
+    applied_at TEXT DEFAULT (datetime('now'))
+  )`)
+  const optInMigration = await client.execute(
+    "SELECT name FROM app_migrations WHERE name = 'notifications_opt_in_v1'"
+  )
+  if (!optInMigration.rows?.length) {
+    await client.execute(`UPDATE users SET
+      notifications_enabled = 0,
+      notify_water = 0,
+      notify_meals = 0,
+      notify_events = 0,
+      notify_morning = 0`)
+    await client.execute(
+      "INSERT INTO app_migrations (name) VALUES ('notifications_opt_in_v1')"
+    )
+    console.log('🔕 Personal reminders reset to opt-in')
+  }
 }
 
 function initSqlite(db) {
@@ -225,9 +247,9 @@ function initSqlite(db) {
       goal TEXT DEFAULT 'health', activity TEXT DEFAULT 'medium',
       age INTEGER, weight REAL, height REAL, gender TEXT DEFAULT 'female',
       onboarded INTEGER DEFAULT 0,
-      notifications_enabled INTEGER DEFAULT 1,
-      notify_water INTEGER DEFAULT 1, notify_meals INTEGER DEFAULT 1,
-      notify_events INTEGER DEFAULT 1, notify_morning INTEGER DEFAULT 1,
+      notifications_enabled INTEGER DEFAULT 0,
+      notify_water INTEGER DEFAULT 0, notify_meals INTEGER DEFAULT 0,
+      notify_events INTEGER DEFAULT 0, notify_morning INTEGER DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now')));
     CREATE TABLE IF NOT EXISTS meals (
       id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
@@ -287,5 +309,19 @@ function initSqlite(db) {
       type TEXT, data TEXT, sent INTEGER DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now')));
   `)
+  db.exec(`CREATE TABLE IF NOT EXISTS app_migrations (
+    name TEXT PRIMARY KEY,
+    applied_at TEXT DEFAULT (datetime('now'))
+  )`)
+  const optInMigration = db.prepare("SELECT name FROM app_migrations WHERE name = 'notifications_opt_in_v1'").get()
+  if (!optInMigration) {
+    db.exec(`UPDATE users SET
+      notifications_enabled = 0,
+      notify_water = 0,
+      notify_meals = 0,
+      notify_events = 0,
+      notify_morning = 0`)
+    db.prepare("INSERT INTO app_migrations (name) VALUES ('notifications_opt_in_v1')").run()
+  }
   console.log('✅ SQLite schema ready')
 }
