@@ -218,4 +218,94 @@ router.delete('/foods/:id', adminAuth, async (req, res) => {
   res.json({ ok: true })
 })
 
+
+async function ensureBroadcastsTable() {
+  await exec(`CREATE TABLE IF NOT EXISTS broadcasts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    type TEXT NOT NULL,
+    title TEXT DEFAULT '',
+    message TEXT NOT NULL,
+    audience TEXT DEFAULT 'all',
+    button_text TEXT DEFAULT '',
+    button_url TEXT DEFAULT '',
+    sent_count INTEGER DEFAULT 0,
+    failed_count INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now'))
+  )`)
+}
+
+// BROADCASTS — separate from personal reminder preferences
+router.get('/broadcasts', adminAuth, async (req, res) => {
+  try {
+    await ensureBroadcastsTable()
+    const broadcasts = await q('SELECT * FROM broadcasts ORDER BY created_at DESC LIMIT 100')
+    res.json({ broadcasts })
+  } catch(e) { res.status(500).json({ error: e.message }) }
+})
+
+router.post('/broadcasts', adminAuth, async (req, res) => {
+  const {
+    type = 'announcement',
+    title = '',
+    message = '',
+    audience = 'all',
+    button_text = '',
+    button_url = ''
+  } = req.body || {}
+
+  const cleanMessage = String(message).trim()
+  const cleanTitle = String(title).trim()
+  if (!cleanMessage) return res.status(400).json({ error: 'Введите текст рассылки' })
+  if (cleanMessage.length > 3500) return res.status(400).json({ error: 'Текст рассылки слишком длинный' })
+  if (!process.env.BOT_TOKEN) return res.status(500).json({ error: 'BOT_TOKEN не настроен' })
+
+  const safeType = ['announcement', 'motivation', 'event'].includes(type) ? type : 'announcement'
+  const safeAudience = audience === 'reminders' ? 'reminders' : 'all'
+  const icons = { announcement: '📣', motivation: '✨', event: '📅' }
+  const heading = cleanTitle ? `${icons[safeType]} ${cleanTitle}\n\n` : `${icons[safeType]} `
+  const text = heading + cleanMessage
+
+  try {
+    await ensureBroadcastsTable()
+    const users = await q(
+      safeAudience === 'reminders'
+        ? 'SELECT telegram_id FROM users WHERE onboarded = 1 AND notifications_enabled = 1 AND telegram_id IS NOT NULL'
+        : 'SELECT telegram_id FROM users WHERE onboarded = 1 AND telegram_id IS NOT NULL'
+    )
+
+    let sent = 0
+    let failed = 0
+    const url = String(button_url || '').trim()
+    const label = String(button_text || '').trim()
+    const replyMarkup = label && /^https:\/\//i.test(url)
+      ? { inline_keyboard: [[{ text: label, url }]] }
+      : undefined
+
+    for (const user of users) {
+      try {
+        const response = await fetch(`https://api.telegram.org/bot${process.env.BOT_TOKEN}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: user.telegram_id,
+            text,
+            reply_markup: replyMarkup
+          })
+        })
+        if (response.ok) sent += 1
+        else failed += 1
+      } catch {
+        failed += 1
+      }
+      await new Promise(resolve => setTimeout(resolve, 60))
+    }
+
+    const result = await r(
+      'INSERT INTO broadcasts (type, title, message, audience, button_text, button_url, sent_count, failed_count) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [safeType, cleanTitle, cleanMessage, safeAudience, label, url, sent, failed]
+    )
+    res.json({ ok: true, id: result.lastInsertRowid, recipients: users.length, sent, failed })
+  } catch(e) { res.status(500).json({ error: e.message }) }
+})
+
 module.exports = router
