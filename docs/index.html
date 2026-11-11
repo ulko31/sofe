@@ -111,6 +111,7 @@
   <div class="nav-item" onclick="showPage('nutrition')"><i class="ti ti-salad"></i> Питание</div>
   <div class="nav-item" onclick="showPage('workouts_admin')"><i class="ti ti-barbell"></i> Тренировки</div>
   <div class="nav-item" onclick="showPage('places_admin')"><i class="ti ti-map-pin"></i> Карта мест</div>
+  <div class="nav-item" onclick="showPage('broadcasts')"><i class="ti ti-speakerphone"></i> Рассылки</div>
   <div class="nav-item" onclick="showPage('settings')"><i class="ti ti-settings"></i> Настройки</div>
 </div>
 
@@ -259,6 +260,70 @@
       2. Нажми правой кнопкой → "Поделиться" → "Все у кого есть ссылка"<br>
       3. Скопируй ссылку и вставь в поле "Ссылка на видео"<br>
       Формат: <code>https://drive.google.com/file/d/XXXX/view</code>
+    </div>
+  </div>
+
+  <!-- BROADCASTS -->
+  <div id="page-broadcasts" class="hidden">
+    <div class="topbar">
+      <div>
+        <h2>Рассылки в Telegram</h2>
+        <p style="font-size:12px;color:var(--text-muted);margin-top:4px;">Объявления, мероприятия и мотивационные сообщения — отдельно от личных напоминаний</p>
+      </div>
+    </div>
+
+    <div class="grid-2" style="align-items:start;">
+      <div class="card">
+        <h3 style="margin-bottom:16px;">Новое сообщение</h3>
+        <label>Тип сообщения</label>
+        <select id="broadcast-type" onchange="updateBroadcastPreview()">
+          <option value="announcement">📣 Объявление</option>
+          <option value="event">📅 Мероприятие</option>
+          <option value="motivation">✨ Мотивация</option>
+        </select>
+
+        <label style="margin-top:14px;">Заголовок</label>
+        <input id="broadcast-title" type="text" placeholder="Например: Тренировка в субботу" oninput="updateBroadcastPreview()">
+
+        <label style="margin-top:14px;">Текст</label>
+        <textarea id="broadcast-message" rows="7" placeholder="Напиши сообщение пользователям..." oninput="updateBroadcastPreview()"></textarea>
+
+        <label style="margin-top:14px;">Получатели</label>
+        <select id="broadcast-audience">
+          <option value="all">Все зарегистрированные пользователи</option>
+          <option value="reminders">Только включившие персональные напоминания</option>
+        </select>
+
+        <div class="grid-2" style="margin-top:14px;">
+          <div>
+            <label>Текст кнопки — необязательно</label>
+            <input id="broadcast-button-text" type="text" placeholder="Открыть SOFE">
+          </div>
+          <div>
+            <label>Ссылка кнопки</label>
+            <input id="broadcast-button-url" type="text" placeholder="https://...">
+          </div>
+        </div>
+
+        <button class="btn btn-pink" style="width:100%;margin-top:18px;" onclick="sendBroadcast()">
+          <i class="ti ti-send"></i> Отправить рассылку
+        </button>
+        <p style="font-size:11px;color:var(--text-muted);line-height:1.5;margin-top:10px;">
+          Персональные напоминания о воде, еде и отчётах выключены по умолчанию. Эта рассылка отправляется отдельно.
+        </p>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-bottom:16px;">Предпросмотр</h3>
+        <div id="broadcast-preview" style="background:#f4f4f4;border-radius:14px;padding:18px;min-height:150px;white-space:pre-wrap;line-height:1.55;">
+          📣 Здесь появится текст сообщения
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:20px;">
+      <h3 style="margin-bottom:14px;">История рассылок</h3>
+      <div id="broadcast-history"><div class="loading">Загрузка...</div></div>
     </div>
   </div>
 
@@ -1055,6 +1120,70 @@ async function deletePlace(id) {
   showToast('🗑 Удалено')
 }
 
+function updateBroadcastPreview() {
+  const icons = { announcement: '📣', event: '📅', motivation: '✨' }
+  const type = document.getElementById('broadcast-type')?.value || 'announcement'
+  const title = document.getElementById('broadcast-title')?.value.trim()
+  const message = document.getElementById('broadcast-message')?.value.trim()
+  const preview = document.getElementById('broadcast-preview')
+  if (!preview) return
+  preview.textContent = (title ? icons[type] + ' ' + title + '\n\n' : icons[type] + ' ') + (message || 'Здесь появится текст сообщения')
+}
+
+function escapeBroadcastHtml(value) {
+  return String(value || '').replace(/[&<>"']/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#039;' }[ch]))
+}
+
+async function loadBroadcasts() {
+  const box = document.getElementById('broadcast-history')
+  if (!box) return
+  try {
+    const data = await apiFetch('/admin/broadcasts')
+    const rows = data.broadcasts || []
+    if (!rows.length) {
+      box.innerHTML = '<div class="empty">Рассылок пока не было</div>'
+      return
+    }
+    const typeLabel = { announcement: '📣 Объявление', event: '📅 Мероприятие', motivation: '✨ Мотивация' }
+    box.innerHTML = `<table>
+      <thead><tr><th>Тип</th><th>Сообщение</th><th>Аудитория</th><th>Результат</th><th>Дата</th></tr></thead>
+      <tbody>${rows.map(row => `<tr>
+        <td>${typeLabel[row.type] || row.type}</td>
+        <td><strong>${escapeBroadcastHtml(row.title)}</strong><div style="font-size:11px;color:var(--text-muted);margin-top:3px;max-width:360px;">${escapeBroadcastHtml(row.message).slice(0,180)}</div></td>
+        <td>${row.audience === 'reminders' ? 'С напоминаниями' : 'Все'}</td>
+        <td><span style="color:#2e7d32;">✓ ${row.sent_count || 0}</span>${row.failed_count ? ` · <span style="color:#c62828;">ошибок ${row.failed_count}</span>` : ''}</td>
+        <td>${escapeBroadcastHtml(row.created_at || '')}</td>
+      </tr>`).join('')}</tbody>
+    </table>`
+  } catch(e) {
+    box.innerHTML = '<div class="empty">Не удалось загрузить историю: ' + escapeBroadcastHtml(e.message) + '</div>'
+  }
+}
+
+async function sendBroadcast() {
+  const message = document.getElementById('broadcast-message').value.trim()
+  if (!message) { alert('Введите текст рассылки'); return }
+  const data = {
+    type: document.getElementById('broadcast-type').value,
+    title: document.getElementById('broadcast-title').value.trim(),
+    message,
+    audience: document.getElementById('broadcast-audience').value,
+    button_text: document.getElementById('broadcast-button-text').value.trim(),
+    button_url: document.getElementById('broadcast-button-url').value.trim()
+  }
+  const audienceText = data.audience === 'all' ? 'всем зарегистрированным пользователям' : 'пользователям с включёнными напоминаниями'
+  if (!confirm('Отправить это сообщение ' + audienceText + '?')) return
+
+  try {
+    const result = await apiFetch('/admin/broadcasts', 'POST', data)
+    showToast('✅ Отправлено: ' + result.sent + ' · ошибок: ' + result.failed)
+    document.getElementById('broadcast-title').value = ''
+    document.getElementById('broadcast-message').value = ''
+    updateBroadcastPreview()
+    loadBroadcasts()
+  } catch(e) { alert('Ошибка рассылки: ' + e.message) }
+}
+
 // Patch showPage to load new sections
 const _origShowPage = showPage
 showPage = function(page) {
@@ -1069,6 +1198,7 @@ showPage = function(page) {
   if (page === 'nutrition') loadNutrition()
   if (page === 'workouts_admin') loadWorkoutsAdmin()
   if (page === 'places_admin') loadPlacesAdmin()
+  if (page === 'broadcasts') loadBroadcasts()
 }
 
 // Init
