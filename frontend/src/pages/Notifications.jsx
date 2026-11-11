@@ -11,24 +11,24 @@ const SETTINGS = [
 
 export default function Notifications({ user, onBack }) {
   const { haptic } = useTelegram()
-  const [enabled, setEnabled] = useState(true)
+  const [enabled, setEnabled] = useState(false)
   const [settings, setSettings] = useState({
-    notify_morning: true,
-    notify_meals: true,
-    notify_water: true,
-    notify_events: true
+    notify_morning: false,
+    notify_meals: false,
+    notify_water: false,
+    notify_events: false
   })
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
     if (user) {
-      setEnabled(user.notifications_enabled !== 0)
+      setEnabled(user.notifications_enabled === 1)
       setSettings({
-        notify_morning: user.notify_morning !== 0,
-        notify_meals: user.notify_meals !== 0,
-        notify_water: user.notify_water !== 0,
-        notify_events: user.notify_events !== 0
+        notify_morning: user.notify_morning === 1,
+        notify_meals: user.notify_meals === 1,
+        notify_water: user.notify_water === 1,
+        notify_events: user.notify_events === 1
       })
     }
   }, [user])
@@ -71,8 +71,8 @@ export default function Notifications({ user, onBack }) {
         {/* Master toggle */}
         <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 800 }}>🔔 Все уведомления</div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Включить или выключить все</div>
+            <div style={{ fontSize: 15, fontWeight: 800 }}>🔔 Персональные напоминания</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Выключены, пока ты сама их не включишь</div>
           </div>
           <Toggle value={enabled} onChange={setEnabled} />
         </div>
@@ -89,6 +89,13 @@ export default function Notifications({ user, onBack }) {
               <Toggle value={settings[s.key] && enabled} onChange={(v) => { if (enabled) setSettings(st => ({ ...st, [s.key]: v })) }} />
             </div>
           ))}
+        </div>
+
+        <div className="card" style={{ background: 'var(--green-light)', border: 'none' }}>
+          <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--green-dark)', marginBottom: 4 }}>📣 Новости SOFE</div>
+          <div style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.5 }}>
+            Объявления мероприятий и редкие сообщения от команды SOFE приходят отдельно от персональных напоминаний.
+          </div>
         </div>
 
         {/* Schedule info */}
