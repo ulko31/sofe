@@ -193,8 +193,8 @@
     </div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>ID</th><th>Имя</th><th>Telegram</th><th>Цель</th><th>Калории</th><th>Статус</th><th>Зарегистрирован</th><th>Действия</th></tr></thead>
-        <tbody id="users-table"><tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px;">Загрузка...</td></tr></tbody>
+        <thead><tr><th>ID</th><th>Имя</th><th>Telegram</th><th>Цель</th><th>Калории</th><th>Статус</th><th>Последняя активность</th><th>Зарегистрирован</th><th>Действия</th></tr></thead>
+        <tbody id="users-table"><tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:24px;">Загрузка...</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -662,8 +662,20 @@ async function loadUsers() {
     allUsers = data.users || []
     renderUsers(allUsers)
   } catch(e) {
-    document.getElementById('users-table').innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px;">⚙️ Настрой подключение в разделе «Настройки»</td></tr>'
+    document.getElementById('users-table').innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:24px;">⚙️ Настрой подключение в разделе «Настройки»</td></tr>'
   }
+}
+
+function formatLastSeen(value) {
+  if (!value) return '<span style="color:var(--text-muted)">Ещё не заходил после обновления</span>'
+  const normalized = /Z$|[+-]\d\d:\d\d$/.test(value) ? value : value.replace(' ', 'T') + 'Z'
+  const date = new Date(normalized)
+  if (Number.isNaN(date.getTime())) return value
+  const today = new Date()
+  const sameDay = date.toDateString() === today.toDateString()
+  return sameDay
+    ? `Сегодня, ${date.toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' })}`
+    : date.toLocaleString('ru', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
 function renderUsers(users) {
@@ -676,9 +688,10 @@ function renderUsers(users) {
       <td>${goalMap[u.goal] || '—'}</td>
       <td>${u.calories || 2000} ккал</td>
       <td><span class="status ${u.onboarded ? 'status-active' : 'status-new'}">${u.onboarded ? 'Активен' : 'Новый'}</span></td>
+      <td style="white-space:nowrap;font-size:12px;">${formatLastSeen(u.last_seen_at)}</td>
       <td>${new Date(u.created_at).toLocaleDateString('ru')}</td>
       <td><button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id})">Удалить</button></td>
-    </tr>`).join('') : '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px;">Нет пользователей</td></tr>'
+    </tr>`).join('') : '<tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:24px;">Нет пользователей</td></tr>'
 }
 
 function filterUsers(q) {

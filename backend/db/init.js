@@ -153,6 +153,7 @@ async function initTurso(client) {
       notifications_enabled INTEGER DEFAULT 0,
       notify_water INTEGER DEFAULT 0, notify_meals INTEGER DEFAULT 0,
       notify_events INTEGER DEFAULT 0, notify_morning INTEGER DEFAULT 0,
+      last_seen_at TEXT,
       created_at TEXT DEFAULT (datetime('now')))`,
     `CREATE TABLE IF NOT EXISTS meals (
       id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
@@ -216,6 +217,9 @@ async function initTurso(client) {
     try { await client.execute(sql) } catch(e) {}
   }
 
+  // Existing databases need the activity column added separately.
+  try { await client.execute('ALTER TABLE users ADD COLUMN last_seen_at TEXT') } catch(e) {}
+
   // Existing accounts were created with reminders enabled by default.
   // Reset them once so every personal reminder requires explicit opt-in.
   await client.execute(`CREATE TABLE IF NOT EXISTS app_migrations (
@@ -250,6 +254,7 @@ function initSqlite(db) {
       notifications_enabled INTEGER DEFAULT 0,
       notify_water INTEGER DEFAULT 0, notify_meals INTEGER DEFAULT 0,
       notify_events INTEGER DEFAULT 0, notify_morning INTEGER DEFAULT 0,
+      last_seen_at TEXT,
       created_at TEXT DEFAULT (datetime('now')));
     CREATE TABLE IF NOT EXISTS meals (
       id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
@@ -309,6 +314,7 @@ function initSqlite(db) {
       type TEXT, data TEXT, sent INTEGER DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now')));
   `)
+  try { db.exec('ALTER TABLE users ADD COLUMN last_seen_at TEXT') } catch(e) {}
   db.exec(`CREATE TABLE IF NOT EXISTS app_migrations (
     name TEXT PRIMARY KEY,
     applied_at TEXT DEFAULT (datetime('now'))

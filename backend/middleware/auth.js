@@ -25,6 +25,17 @@ module.exports = async function auth(req, res, next) {
       user = await queryOne('SELECT * FROM users WHERE id = ?', [result.lastInsertRowid])
     }
 
+    // Opening the mini app always calls an authenticated endpoint. Recording it
+    // here makes activity independent from meal entries and other user actions.
+    try {
+      await run("UPDATE users SET last_seen_at = datetime('now') WHERE id = ?", [user.id])
+      user.last_seen_at = new Date().toISOString()
+    } catch (activityError) {
+      // During a fresh deploy the schema migration can finish a moment later.
+      // Authentication should still succeed; the next request will be tracked.
+      console.warn('Activity tracking is not ready:', activityError.message)
+    }
+
     req.user = user
     req.tgUser = tgUser
     next()

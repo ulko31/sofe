@@ -17,23 +17,34 @@ router.get('/stats', adminAuth, async (req, res) => {
     const events = await q('SELECT * FROM events')
     const recipes = await q('SELECT * FROM recipes')
     const today = new Date().toISOString().split('T')[0]
-    const todayMeals = meals.filter(m => m.date === today)
-    const activeToday = new Set(todayMeals.map(m => m.user_id)).size
+    const activeToday = users.filter(u => u.last_seen_at?.startsWith(today)).length
+    const goals = users.reduce((result, user) => {
+      const goal = user.goal || 'health'
+      result[goal] = (result[goal] || 0) + 1
+      return result
+    }, {})
+    const upcomingEvents = events.filter(event => event.date >= today).length
     res.json({
       totalUsers: users.length,
       onboardedUsers: users.filter(u => u.onboarded).length,
       activeToday,
       totalMeals: meals.length,
       totalEvents: events.length,
+      upcomingEvents,
       totalRecipes: recipes.length,
-      newUsersToday: users.filter(u => u.created_at?.startsWith(today)).length
+      newUsersToday: users.filter(u => u.created_at?.startsWith(today)).length,
+      newToday: users.filter(u => u.created_at?.startsWith(today)).length,
+      goals,
+      recentUsers: users
+        .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
+        .slice(0, 8)
     })
   } catch(e) { res.status(500).json({ error: e.message }) }
 })
 
 // USERS
 router.get('/users', adminAuth, async (req, res) => {
-  const users = await q('SELECT * FROM users ORDER BY created_at DESC')
+  const users = await q('SELECT * FROM users ORDER BY COALESCE(last_seen_at, created_at) DESC')
   res.json({ users })
 })
 router.delete('/users/:id', adminAuth, async (req, res) => {
@@ -163,28 +174,6 @@ router.get('/nutrition', adminAuth, async (req, res) => {
 router.delete('/nutrition/:id', adminAuth, async (req, res) => {
   await r('DELETE FROM meals WHERE id = ?', [req.params.id])
   res.json({ ok: true })
-})
-
-// STATS for dashboard
-router.get('/stats', adminAuth, async (req, res) => {
-  try {
-    const users = await q('SELECT * FROM users')
-    const meals = await q('SELECT * FROM meals')
-    const events = await q('SELECT * FROM events')
-    const recipes = await q('SELECT * FROM recipes')
-    const today = new Date().toISOString().split('T')[0]
-    const todayMeals = meals.filter(m => m.date === today)
-    const activeToday = new Set(todayMeals.map(m => m.user_id)).size
-    res.json({
-      totalUsers: users.length,
-      onboardedUsers: users.filter(u => u.onboarded).length,
-      activeToday,
-      totalMeals: meals.length,
-      totalEvents: events.length,
-      totalRecipes: recipes.length,
-      newUsersToday: users.filter(u => u.created_at?.startsWith(today)).length
-    })
-  } catch(e) { res.status(500).json({ error: e.message }) }
 })
 
 // USERS - update onboarded/notifications
