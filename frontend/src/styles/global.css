@@ -1,22 +1,21 @@
 :root {
-  /* SOFE brand: deep berry + warm volt yellow + graphite */
-  --pink: #9C173C;
-  --pink-light: #F1E5E7;
-  --pink-mid: #C99BA7;
-  --pink-dark: #681029;
-  --green: #D8DB32;
-  --green-light: #F3F1C5;
-  --green-mid: #E5E077;
-  --green-dark: #5E5A10;
-  --bg: #F4EFE6;
-  --white: #FFFCF7;
-  --text: #292526;
-  --text-muted: #756F6D;
-  --border: #E3DAD2;
-  --radius: 14px;
+  --pink: #E8437A;
+  --pink-light: #FBEAF0;
+  --pink-mid: #F4C0D1;
+  --pink-dark: #C2305E;
+  --green: #4CAF50;
+  --green-light: #EAF3DE;
+  --green-mid: #C0DD97;
+  --green-dark: #3B6D11;
+  --bg: #F7F5F0;
+  --white: #FFFFFF;
+  --text: #1A1A1A;
+  --text-muted: #888780;
+  --border: #EEEEEE;
+  --radius: 16px;
   --radius-sm: 10px;
   --radius-xs: 6px;
-  --shadow: 0 8px 28px rgba(55,45,36,0.07);
+  --shadow: 0 2px 12px rgba(0,0,0,0.06);
 }
 
 * {
@@ -31,7 +30,7 @@ html, body {
   height: 100%;
   overflow-x: hidden;
   background: var(--bg);
-  font-family: 'Manrope', sans-serif;
+  font-family: 'Nunito', sans-serif;
   color: var(--text);
   font-size: 16px;
   line-height: 1.5;
@@ -49,7 +48,7 @@ html, body {
 
 /* Buttons */
 button {
-  font-family: 'Manrope', sans-serif !important;
+  font-family: 'Nunito', sans-serif;
   cursor: pointer;
   border: none;
   background: none;
@@ -59,7 +58,7 @@ button {
 button:active { transform: scale(0.97); }
 
 .btn-primary {
-  background: var(--text);
+  background: var(--pink);
   color: white;
   border-radius: 14px;
   padding: 14px 24px;
@@ -68,7 +67,7 @@ button:active { transform: scale(0.97); }
   width: 100%;
   transition: background 0.15s;
 }
-.btn-primary:hover { background: #161415; }
+.btn-primary:hover { background: var(--pink-dark); }
 
 .btn-outline {
   background: transparent;
@@ -87,7 +86,6 @@ button:active { transform: scale(0.97); }
   border-radius: var(--radius);
   border: 0.5px solid var(--border);
   padding: 16px;
-  box-shadow: 0 5px 18px rgba(42, 45, 41, 0.035);
 }
 
 /* Screen layout */
@@ -172,7 +170,7 @@ input[type="number"],
 input[type="email"],
 textarea,
 select {
-  font-family: 'Manrope', sans-serif !important;
+  font-family: 'Nunito', sans-serif;
   width: 100%;
   padding: 12px 14px;
   border: 1.5px solid var(--border);
