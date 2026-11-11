@@ -2,29 +2,6 @@ import { useState, useEffect, useRef } from 'react'
 import { useTelegram } from '../hooks/useTelegram'
 import api from '../utils/api'
 
-const GROQ_TOKEN = import.meta.env.VITE_GROQ_TOKEN
-const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
-const MODEL = 'qwen/qwen3.6-27b'
-
-function buildSystemPrompt(user, consumed, eventsText) {
-  return `Ты SOFE — персональный ИИ-ассистент по здоровью и питанию. Ты дружелюбная, заботливая и мотивирующая подруга-эксперт.
-
-Данные пользователя:
-- Имя: ${user?.name || 'пользователь'}
-- Цель: ${{ lose_weight: 'похудеть', gain_muscle: 'набрать мышцы', maintain: 'поддерживать вес', health: 'улучшить здоровье' }[user?.goal] || 'здоровье'}
-- Норма калорий: ${user?.calories || 2000} ккал/день
-- Потреблено сегодня: ${consumed} ккал
-- Осталось: ${Math.max(0, (user?.calories || 2000) - consumed)} ккал
-${eventsText ? `\nПредстоящие мероприятия:\n${eventsText}` : ''}
-
-Правила:
-- ВСЕГДА отвечай только на русском языке
-- Отвечай коротко — 2-4 предложения
-- Давай конкретные советы с цифрами
-- 1-2 эмодзи на ответ
-- Никогда не давай медицинских диагнозов`
-}
-
 export default function AIAssistant({ user, onBack }) {
   const { haptic } = useTelegram()
   const [messages, setMessages] = useState([
@@ -33,8 +10,6 @@ export default function AIAssistant({ user, onBack }) {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [suggestions, setSuggestions] = useState([])
-  const [todayConsumed, setTodayConsumed] = useState(0)
-  const [eventsText, setEventsText] = useState('')
   const [showSuggestions, setShowSuggestions] = useState(true)
   const bottomRef = useRef(null)
   const messagesRef = useRef(null)
@@ -69,16 +44,6 @@ export default function AIAssistant({ user, onBack }) {
         '📅 Какие мероприятия скоро?'
       ])
     })
-    api.get('/nutrition/today').then(r => setTodayConsumed(r.data.consumed || 0)).catch(() => {})
-    api.get('/events/all').then(r => {
-      const now = new Date()
-      const upcoming = (r.data || [])
-        .filter(e => new Date(e.date) >= now)
-        .slice(0, 5)
-        .map(e => `- ${e.emoji} ${e.title} (${new Date(e.date).toLocaleDateString('ru', { day: 'numeric', month: 'short' })}, ${e.time}, ${e.location})`)
-        .join('\n')
-      if (upcoming) setEventsText(upcoming)
-    }).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -96,43 +61,17 @@ export default function AIAssistant({ user, onBack }) {
     const userMsg = { role: 'user', content: msg }
     setMessages(prev => [...prev, userMsg])
 
-    if (!GROQ_TOKEN) {
-      setMessages(prev => [...prev, { role: 'assistant', content: '⚙️ Токен Groq не настроен. Добавь VITE_GROQ_TOKEN в Vercel.' }])
-      setLoading(false)
-      return
-    }
-
     try {
-      const response = await fetch(GROQ_URL, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${GROQ_TOKEN}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: MODEL,
-          messages: [
-            { role: 'system', content: buildSystemPrompt(user, todayConsumed, eventsText) },
-            ...messages.slice(-6),
-            userMsg
-          ],
-          max_tokens: 400,
-          temperature: 0.7
-        })
+      const response = await api.post('/ai/chat', {
+        message: msg,
+        history: messages.slice(-6)
       })
-
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}))
-        if (response.status === 401) throw new Error('invalid_token')
-        if (response.status === 429) throw new Error('rate_limit')
-        throw new Error(err.error?.message || `HTTP ${response.status}`)
-      }
-
-      const data = await response.json()
-      const reply = data.choices?.[0]?.message?.content?.trim()
+      const reply = response.data?.reply?.trim()
       if (!reply) throw new Error('empty')
       setMessages(prev => [...prev, { role: 'assistant', content: reply }])
     } catch(e) {
-      let errMsg = 'Что-то пошло не так 😔 Попробуй ещё раз.'
-      if (e.message === 'invalid_token') errMsg = '🔑 Токен Groq недействителен.'
-      if (e.message === 'rate_limit') errMsg = '⏳ Слишком много запросов. Подожди минуту.'
+      let errMsg = e.response?.data?.message || 'Что-то пошло не так 😔 Попробуй ещё раз.'
+      if (e.response?.status === 429) errMsg = '⏳ Слишком много запросов. Подожди минуту.'
       setMessages(prev => [...prev, { role: 'assistant', content: errMsg }])
     } finally {
       setLoading(false)
@@ -151,7 +90,7 @@ export default function AIAssistant({ user, onBack }) {
         </div>
         <div>
           <div style={{ color: 'white', fontWeight: 800, fontSize: 16 }}>SOFE ИИ-ассистент</div>
-          <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12 }}>на базе Llama 3 · Groq</div>
+          <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12 }}>на базе Llama 4 · Groq</div>
         </div>
       </div>
 
