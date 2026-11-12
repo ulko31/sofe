@@ -4,12 +4,12 @@ import { searchLocalFoods } from '../utils/commonFoods'
 import { useTelegram } from '../hooks/useTelegram'
 import FoodScan from './FoodScan'
 
-export default function Home({ user, onOpenAI, onTabChange }) {
+export default function Home({ user, onOpenAI, onTabChange, demo = false }) {
   const { haptic } = useTelegram()
   const [stats, setStats] = useState({ consumed: 0, goal: user?.calories || 2000, burned: 0, protein: 0, fat: 0, carbs: 0 })
   const [trackers, setTrackers] = useState({ water: 0, steps: 0, sleep: 0, pulse: 0 })
   const [meals, setMeals] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!demo)
   const [showAddMeal, setShowAddMeal] = useState(false)
   const [addMealType, setAddMealType] = useState('snack')
   const [showScan, setShowScan] = useState(false)
@@ -45,13 +45,13 @@ export default function Home({ user, onOpenAI, onTabChange }) {
   }
 
   useEffect(() => {
-    if (!user) return
+    if (!user || demo) return
     loadData()
   }, [user])
 
   // Reload when app comes to foreground (catches new day)
   useEffect(() => {
-    if (!user) return
+    if (!user || demo) return
     const onVisible = () => {
       if (document.visibilityState === 'visible') loadData()
     }
