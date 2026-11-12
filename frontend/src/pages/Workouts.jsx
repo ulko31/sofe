@@ -30,12 +30,12 @@ function getVideoEmbedUrl(url) {
   return url
 }
 
-export default function Workouts({ user, onTabChange, onBack }) {
+export default function Workouts({ user, onTabChange, onBack, demo = false }) {
   const { haptic } = useTelegram()
   const [filter, setFilter] = useState('Все')
   const [workouts, setWorkouts] = useState([])
   const [gyms, setGyms] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!demo)
   const [workoutError, setWorkoutError] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
   const [selectedWorkout, setSelectedWorkout] = useState(null)
@@ -46,6 +46,15 @@ export default function Workouts({ user, onTabChange, onBack }) {
   const [editingGym, setEditingGym] = useState(null)
 
   useEffect(() => {
+    if (demo) {
+      setWorkouts([
+        {id:'demo-1',name:'Мягкая растяжка',type:'Stretching',duration:20,format:'Видео',level:'Начальный',instructor:'SOFE'},
+        {id:'demo-2',name:'Утренняя активность',type:'FIT',duration:15,format:'Видео',level:'Для всех',instructor:'SOFE'},
+        {id:'demo-3',name:'Йога и баланс',type:'Йога',duration:25,format:'Видео',level:'Начальный',instructor:'SOFE'}
+      ])
+      setLoading(false)
+      return
+    }
     Promise.all([
       api.get('/workouts'),
       api.get('/workouts/gyms').catch(() => ({ data: [] }))
@@ -57,7 +66,7 @@ export default function Workouts({ user, onTabChange, onBack }) {
       console.error('SOFE workouts failed to load:', error)
       setWorkoutError(true)
     }).finally(() => setLoading(false))
-  }, [reloadKey])
+  }, [reloadKey, demo])
 
   const filtered = filter === 'Все' ? workouts : workouts.filter(w => w.type === filter)
 
@@ -65,6 +74,7 @@ export default function Workouts({ user, onTabChange, onBack }) {
   const [pendingWorkout, setPendingWorkout] = useState(null)
 
   const handleStart = (workout) => {
+    if (demo) { setSelectedWorkout(workout); setShowVideo(false); return }
     haptic('medium')
     setSelectedWorkout(workout)
     if (workout.video_url) {
