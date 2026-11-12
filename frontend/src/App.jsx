@@ -65,8 +65,14 @@ export default function App() {
   }, [user, loadAttempt])
 
   useEffect(() => {
-    if (!window.Telegram?.WebApp?.initData) setLoading(false)
-  }, [])
+    if (user) return
+    if (!window.Telegram?.WebApp?.initData) {
+      setLoading(false)
+      return
+    }
+    const timeout = setTimeout(() => setLoading(false), 12000)
+    return () => clearTimeout(timeout)
+  }, [user])
 
   // Check friend invite on start
   useEffect(() => {
@@ -114,6 +120,14 @@ export default function App() {
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
       <div className="spinner" />
       <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>Загружаем SOFE...</p>
+    </div>
+  )
+
+  if (!user) return (
+    <div style={{ minHeight: '100vh', padding: 24, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: 12, textAlign: 'center' }}>
+      <h2>SOFE</h2>
+      <p style={{ color: 'var(--text-muted)', maxWidth: 340 }}>Не удалось получить данные Telegram. Откройте приложение через бота или перезапустите его в Telegram.</p>
+      <button className="btn-primary" onClick={() => window.location.reload()}>Попробовать снова</button>
     </div>
   )
 
