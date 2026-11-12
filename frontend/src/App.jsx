@@ -11,39 +11,6 @@ import Calendar from './pages/Calendar'
 import Onboarding from './pages/Onboarding'
 import AIAssistant from './pages/AIAssistant'
 
-function PublicDemoFeature({ tab, onNavigate }) {
-  const [question, setQuestion] = useState('')
-  const [answer, setAnswer] = useState('')
-  const pages = {
-    map: { title: 'Карта активностей', image: 'map.png', note: 'Пример экрана с местами для спорта и активности. В деморежиме персональные точки не загружаются.' },
-    calendar: { title: 'События и календарь', image: 'calendar.png', note: 'Пример планирования событий и тренировок. Реальные записи доступны после входа.' },
-    profile: { title: 'Профиль', image: 'profile.png', note: 'Пример профиля без настоящих личных данных.' }
-  }
-  const current = pages[tab]
-  const base = 'https://raw.githubusercontent.com/ulko31/sofe/main/images/'
-  return (
-    <div className="screen" style={{ paddingBottom: 95 }}>
-      <h2 style={{ fontSize: 23, fontWeight: 900, marginBottom: 10 }}>{current?.title || 'SOFE ИИ-ассистент'}</h2>
-      {current ? (
-        <>
-          <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>{current.note}</p>
-          <img src={base + current.image} alt={'Оригинальный экран: ' + current.title} style={{ width: '100%', maxWidth: 420, borderRadius: 20, margin: '15px auto', display: 'block', boxShadow: '0 7px 24px #00000015' }} />
-          <button className="btn-primary" onClick={() => onNavigate('assistant')}>Открыть ИИ-ассистента</button>
-        </>
-      ) : (
-        <>
-          <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Демонстрация интерфейса ассистента. Реальный персональный помощник работает только после входа в Telegram.</p>
-          <img src={base + 'AI-bot.png'} alt="Исходный экран ИИ-ассистента" style={{ width: '100%', maxWidth: 390, borderRadius: 18, display: 'block', margin: '18px auto' }} />
-          <label htmlFor="demo-question" style={{ display: 'block', fontWeight: 700, marginBottom: 6 }}>Пример вопроса</label>
-          <input id="demo-question" placeholder="Как спланировать активный день?" value={question} onChange={e => setQuestion(e.target.value)} style={{ width: '100%', padding: 12, borderRadius: 10 }} />
-          <button className="btn-primary" style={{ marginTop: 10 }} onClick={() => setAnswer(question.trim() ? 'В этой версии показан пример интерфейса. Для персонального ответа откройте SOFE внутри Telegram.' : 'Введите вопрос, чтобы увидеть демонстрацию диалога.')}>Отправить</button>
-          {answer && <div className="card" role="status" style={{ marginTop: 12 }}>{answer}</div>}
-        </>
-      )}
-    </div>
-  )
-}
-
 export default function App() {
   const { user } = useTelegram()
   const [tab, setTab] = useState('home')
@@ -158,14 +125,17 @@ export default function App() {
 
   // Public portfolio preview: isolated sample data, no Telegram identity or backend mutations.
   if (!user && !window.Telegram?.WebApp?.initData) {
-    const Preview = { home: Home, workouts: Workouts }
-    const DemoScreen = Preview[tab]
+    const Preview = { home: Home, workouts: Workouts, nutrition: Nutrition, map: MapScreen, calendar: Calendar, profile: Profile }
+    const DemoScreen = Preview[tab] || Home
+    const guest = { id: 'public-demo', name: 'Гость SOFE', onboarded: true, calories: 2000, goal: 'health', activity: 'medium' }
     return (
       <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
         <div style={{ padding: '8px 16px', fontSize: 12, textAlign: 'center', background: 'var(--green-light)', color: 'var(--text)' }}>
           Демо SOFE · пример интерфейса без личных данных
         </div>
-        {DemoScreen ? <DemoScreen demo user={{ name: 'Гость', onboarded: true }} onTabChange={navigate} onBack={() => setTab('home')} onOpenAI={() => setTab('assistant')} /> : <PublicDemoFeature tab={tab} onNavigate={navigate} />}
+        {tab === 'assistant'
+          ? <AIAssistant demo user={guest} onBack={() => setTab('home')} />
+          : <DemoScreen demo user={guest} tgUser={null} onTabChange={navigate} onBack={() => setTab('home')} onOpenAI={() => setTab('assistant')} />}
         <BottomNav active={tab} onChange={setTab} />
       </div>
     )
