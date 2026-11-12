@@ -14,7 +14,7 @@ const TYPE_LABELS = {
   challenge: '🏆 Челлендж'
 }
 
-export default function Calendar({ onTabChange, onBack }) {
+export default function Calendar({ onTabChange, onBack, demo = false }) {
   const { haptic } = useTelegram()
   const [events, setEvents] = useState([])
   const [today] = useState(new Date())
@@ -23,6 +23,13 @@ export default function Calendar({ onTabChange, onBack }) {
   const [selectedEvent, setSelectedEvent] = useState(null)
 
   useEffect(() => {
+    if(demo){
+      const now=new Date(),day=offset=>{const d=new Date(now);d.setDate(d.getDate()+offset);return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')};
+      setEvents([
+        {id:'demo-event-1',date:day(2),time:'12:00',endTime:'13:00',title:'Тренировка в студии',type:'workout',emoji:'🏋️',color:'#e8437a',location:'Пример места',description:'Демонстрационное событие без записи в системе'},
+        {id:'demo-event-2',date:day(7),time:'17:00',endTime:'18:30',title:'Мастер-класс SOFE',type:'workshop',emoji:'🎓',color:'#8caf49',location:'Онлайн',description:'Пример мероприятия для просмотра календаря'}
+      ]);return;
+    }
     // Try backend first, fallback to events.json
     api.get('/events/all').then(r => {
       setEvents(r.data || [])
@@ -32,7 +39,7 @@ export default function Calendar({ onTabChange, onBack }) {
         .then(data => setEvents(data.events || []))
         .catch(() => setEvents([]))
     })
-  }, [])
+  }, [demo])
 
   // Build calendar grid
   const year = currentDate.getFullYear()
@@ -272,7 +279,7 @@ export default function Calendar({ onTabChange, onBack }) {
             </div>
 
             <div style={{ display: 'flex', gap: 10 }}>
-              {selectedEvent.link ? (
+              {selectedEvent.link && !demo ? (
                 <a href={selectedEvent.link} target="_blank" rel="noreferrer" style={{ flex: 1 }}>
                   <button className="btn-primary" style={{ width: '100%' }} onClick={() => haptic('medium')}>
                     Перейти по ссылке →
@@ -280,7 +287,7 @@ export default function Calendar({ onTabChange, onBack }) {
                 </a>
               ) : (
                 <button className="btn-primary" style={{ flex: 1 }} onClick={() => { haptic('medium'); setSelectedEvent(null) }}>
-                  Записаться
+                  {demo ? 'Демонстрация без регистрации' : 'Записаться'}
                 </button>
               )}
               <button className="btn-outline" style={{ flex: 1 }} onClick={() => setSelectedEvent(null)}>
