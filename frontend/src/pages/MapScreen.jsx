@@ -13,7 +13,7 @@ const CATEGORIES = [
   { id: 'friends', label: 'Подруги', icon: '👯' }
 ]
 
-export default function MapScreen({ user }) {
+export default function MapScreen({ user, demo = false }) {
   const { haptic } = useTelegram()
   const mapRef = useRef(null)
   const mapInstanceRef = useRef(null)
@@ -23,10 +23,18 @@ export default function MapScreen({ user }) {
   const [userLocation, setUserLocation] = useState(DEFAULT_CENTER)
   const [places, setPlaces] = useState([])
   const [friends, setFriends] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!demo)
 
   // Load places from public API
   useEffect(() => {
+    if(demo){
+      setPlaces([
+        {id:'demo-studio',name:'Студия движения',type:'studio',address:'Демо-локация · центр города',emoji:'🏋️',color:'#e8437a',coords:[55.755,37.615],tags:['Тренировки'],rating:0},
+        {id:'demo-cafe',name:'Кафе здорового питания',type:'cafe',address:'Демо-локация · рядом с парком',emoji:'🥗',color:'#96b64d',coords:[55.749,37.620],tags:['Кафе'],rating:0},
+        {id:'demo-spa',name:'Студия восстановления',type:'spa',address:'Демо-локация · район центра',emoji:'💆',color:'#a18ccf',coords:[55.753,37.633],tags:['Восстановление'],rating:0}
+      ]);
+      setFriends([]);setLoading(false);return;
+    }
     api.get('/places').then(r => {
       setPlaces(Array.isArray(r.data) ? r.data.map(p => ({
         ...p,
@@ -38,7 +46,7 @@ export default function MapScreen({ user }) {
     api.get('/friends').then(r => {
       setFriends((r.data || []).filter(f => f.share_location && f.lat && parseFloat(f.lat) !== 0))
     }).catch(() => {})
-  }, [])
+  }, [demo])
 
   // Group places by parent (for chains)
   const groupedPlaces = places.reduce((acc, p) => {
@@ -80,11 +88,12 @@ export default function MapScreen({ user }) {
 
   // Geolocation
   useEffect(() => {
+    if(demo)return;
     navigator.geolocation?.getCurrentPosition(
       pos => setUserLocation([pos.coords.latitude, pos.coords.longitude]),
       () => {}, { timeout: 5000 }
     )
-  }, [])
+  }, [demo])
 
   // Init map
   useEffect(() => {
