@@ -117,7 +117,10 @@ router.get('/workouts', auth, async (req, res) => {
   try {
     const workouts = await q('SELECT * FROM workouts ORDER BY id')
     res.json(workouts)
-  } catch(e) { res.json([]) }
+  } catch (e) {
+    console.error('SOFE workouts query failed:', e)
+    res.status(503).json({ error: 'workouts_unavailable' })
+  }
 })
 
 router.post('/workouts/log', auth, async (req, res) => {
