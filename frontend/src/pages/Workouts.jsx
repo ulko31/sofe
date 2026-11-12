@@ -36,6 +36,8 @@ export default function Workouts({ user, onTabChange, onBack }) {
   const [workouts, setWorkouts] = useState([])
   const [gyms, setGyms] = useState([])
   const [loading, setLoading] = useState(true)
+  const [workoutError, setWorkoutError] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
   const [selectedWorkout, setSelectedWorkout] = useState(null)
   const [showVideo, setShowVideo] = useState(false)
   const [showAddGym, setShowAddGym] = useState(false)
@@ -45,13 +47,17 @@ export default function Workouts({ user, onTabChange, onBack }) {
 
   useEffect(() => {
     Promise.all([
-      api.get('/workouts').catch(() => ({ data: [] })),
+      api.get('/workouts'),
       api.get('/workouts/gyms').catch(() => ({ data: [] }))
     ]).then(([w, g]) => {
       setWorkouts(Array.isArray(w.data) ? w.data : [])
       setGyms(Array.isArray(g.data) ? g.data : [])
+      setWorkoutError(false)
+    }).catch((error) => {
+      console.error('SOFE workouts failed to load:', error)
+      setWorkoutError(true)
     }).finally(() => setLoading(false))
-  }, [])
+  }, [reloadKey])
 
   const filtered = filter === 'Все' ? workouts : workouts.filter(w => w.type === filter)
 
@@ -159,7 +165,13 @@ export default function Workouts({ user, onTabChange, onBack }) {
 
       {/* Workout list */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {filtered.length === 0 && (
+        {workoutError && (
+          <div role="alert" style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)', fontSize: 13 }}>
+            Не удалось загрузить тренировки. Уже добавленные тренировки не потеряны.
+            <button className="btn-outline" style={{ display: 'block', margin: '12px auto' }} onClick={() => { setLoading(true); setReloadKey(k => k + 1) }}>Повторить загрузку</button>
+          </div>
+        )}
+        {!workoutError && filtered.length === 0 && (
           <div style={{ textAlign: 'center', padding: 32, color: 'var(--text-muted)', fontSize: 13 }}>
             <div style={{ fontSize: 40, marginBottom: 8 }}>💪</div>
             Тренировки появятся после добавления в Панели администратора
