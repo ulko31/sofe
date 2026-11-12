@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useTelegram } from '../hooks/useTelegram'
 import api from '../utils/api'
 
-export default function AIAssistant({ user, onBack }) {
+export default function AIAssistant({ user, onBack, demo = false }) {
   const { haptic } = useTelegram()
   const [messages, setMessages] = useState([
     { role: 'assistant', content: `Привет, ${user?.name?.split(' ')[0] || 'красотка'}! 🌸 Я SOFE — твой персональный ассистент по здоровью. Спроси меня что угодно!` }
@@ -35,6 +35,7 @@ export default function AIAssistant({ user, onBack }) {
   }, [])
 
   useEffect(() => {
+    if(demo){setSuggestions(['🥗 Идеи для обеда','💪 Идеи для активности','📅 Что запланировать на неделю?']);return}
     api.get('/ai/suggestions').then(r => setSuggestions(r.data)).catch(() => {
       setSuggestions([
         '🥗 Что съесть на обед?',
@@ -44,7 +45,7 @@ export default function AIAssistant({ user, onBack }) {
         '📅 Какие мероприятия скоро?'
       ])
     })
-  }, [])
+  }, [demo])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -62,6 +63,7 @@ export default function AIAssistant({ user, onBack }) {
     setMessages(prev => [...prev, userMsg])
 
     try {
+      if(demo){setMessages(prev=>[...prev,{role:'assistant',content:'Это интерактивный пример интерфейса SOFE. В настоящем приложении персональный ответ формируется ассистентом после входа.'}]);setLoading(false);return}
       const response = await api.post('/ai/chat', {
         message: msg,
         history: messages.slice(-6)
