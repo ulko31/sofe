@@ -123,10 +123,23 @@ export default function App() {
     </div>
   )
 
+  // Public portfolio preview: isolated sample data, no Telegram identity or backend mutations.
+  if (!user && !window.Telegram?.WebApp?.initData) {
+    const Preview = { home: Home, workouts: Workouts }
+    const DemoScreen = Preview[tab] || Home
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+        <div style={{ padding: '8px 16px', fontSize: 12, textAlign: 'center', background: 'var(--green-light)', color: 'var(--text)' }}>
+          Демо SOFE · пример интерфейса без личных данных
+        </div>
+        <DemoScreen demo user={{ name: 'Гость', onboarded: true }} onTabChange={navigate} onBack={() => setTab('home')} onOpenAI={() => setTab('home')} />
+        <BottomNav active={tab} onChange={setTab} />
+      </div>
+    )
+  }
   if (!user) return (
     <div style={{ minHeight: '100vh', padding: 24, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: 12, textAlign: 'center' }}>
-      <h2>SOFE</h2>
-      <p style={{ color: 'var(--text-muted)', maxWidth: 340 }}>Не удалось получить данные Telegram. Откройте приложение через бота или перезапустите его в Telegram.</p>
+      <h2>SOFE</h2><p>Для входа в личный аккаунт откройте приложение из Telegram.</p>
       <button className="btn-primary" onClick={() => window.location.reload()}>Попробовать снова</button>
     </div>
   )
