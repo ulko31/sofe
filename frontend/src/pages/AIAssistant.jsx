@@ -90,7 +90,7 @@ export default function AIAssistant({ user, onBack }) {
         </div>
         <div>
           <div style={{ color: 'white', fontWeight: 800, fontSize: 16 }}>SOFE ИИ-ассистент</div>
-          <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12 }}>на базе Llama 4 · Groq</div>
+          <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12 }}>на базе GPT-OSS 20B · Groq</div>
         </div>
       </div>
 

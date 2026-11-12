@@ -5,7 +5,7 @@ const { query } = require('../db/turso')
 
 const GROQ_TOKEN = process.env.GROQ_TOKEN || process.env.GROQ_API_KEY
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
-const MODEL = process.env.GROQ_CHAT_MODEL || 'meta-llama/llama-4-scout-17b-16e-instruct'
+const MODEL = 'openai/gpt-oss-20b'
 
 function buildSystemPrompt(user, todayStats) {
   return `Ты SOFE — персональный ИИ-ассистент по здоровью и питанию. Ты дружелюбная, заботливая и мотивирующая подруга-эксперт.
