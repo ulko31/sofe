@@ -5,7 +5,7 @@ import Notifications from './Notifications'
 import Friends from './Friends'
 import Progress from './Progress'
 
-export default function Profile({ user, tgUser, onTabChange, onOpenAI }) {
+export default function Profile({ user, tgUser, onTabChange, onOpenAI, demo = false }) {
   const { haptic } = useTelegram()
   const [progress, setProgress] = useState({ days: 0, weightLost: 0, goalPct: 0 })
   const [editing, setEditing] = useState(false)
@@ -17,7 +17,7 @@ export default function Profile({ user, tgUser, onTabChange, onOpenAI }) {
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
-    getProgress().then(r => setProgress(r.data)).catch(() => {})
+    if(!demo)getProgress().then(r => setProgress(r.data)).catch(() => {})
     if (user) {
       setForm({
         name: user.name || '',
@@ -26,10 +26,11 @@ export default function Profile({ user, tgUser, onTabChange, onOpenAI }) {
         activity: user.activity || 'medium'
       })
     }
-  }, [user])
+  }, [user, demo])
 
   const handleSave = async () => {
     haptic('medium')
+    if(demo){setSaved(true);setEditing(false);return}
     setSaving(true)
     try {
       await updateProfile({
@@ -64,6 +65,7 @@ export default function Profile({ user, tgUser, onTabChange, onOpenAI }) {
     very_high: '🔥 Очень высокий'
   }
 
+  if (demo && (showNotifications || showFriends || showProgress)) return <div className="screen"><h2>Пример профиля</h2><p>Персональные разделы доступны в приложении после входа.</p><button className="btn-primary" onClick={()=>{setShowNotifications(false);setShowFriends(false);setShowProgress(false)}}>Назад</button></div>
   if (showNotifications) return <Notifications user={user} onBack={() => setShowNotifications(false)} />
   if (showFriends) return <Friends user={user} onBack={() => setShowFriends(false)} />
   if (showProgress) return <Progress user={user} onBack={() => setShowProgress(false)} />
