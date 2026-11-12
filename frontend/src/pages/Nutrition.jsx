@@ -8,7 +8,7 @@ const deliveryServices = [
   { id: 'imeal', name: 'iMeal', emoji: '🥩', period: '6 месяцев' }
 ]
 
-export default function Nutrition({ user, onTabChange, onBack }) {
+export default function Nutrition({ user, onTabChange, onBack, demo = false }) {
   const { haptic } = useTelegram()
   const [stats, setStats] = useState({ consumed: 0, goal: user?.calories || 2000, protein: 0, fat: 0, carbs: 0 })
   const [recipes, setRecipes] = useState([])
@@ -17,9 +17,10 @@ export default function Nutrition({ user, onTabChange, onBack }) {
   const [activeTag, setActiveTag] = useState('Все')
 
   useEffect(() => {
+    if(demo){setStats({consumed:0,goal:2000,protein:0,fat:0,carbs:0});setRecipes([{id:'sample',name:'Овощной салат',emoji:'🥗',tags:['Лёгкое'],steps:[{step:1,text:'Подготовьте овощи'},{step:2,text:'Смешайте и подавайте'}]}]);return}
     getTodayStats().then(r => setStats({ ...r.data, goal: r.data.goal || user?.calories || 2000 })).catch(() => {})
     getRecipes().then(r => setRecipes(r.data)).catch(() => {})
-  }, [])
+  }, [demo])
 
   const allTags = ['Все', ...new Set(recipes.flatMap(r => r.tags || []))]
   const filteredRecipes = activeTag === 'Все' ? recipes : recipes.filter(r => (r.tags || []).includes(activeTag))
